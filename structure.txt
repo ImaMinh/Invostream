@@ -1,0 +1,49 @@
+invostream/
+├── .github/
+│   └── copilot-instructions.md
+├── .vscode/
+│
+├── image_process/              ← already here
+│   ├── __init__.py
+│   ├── ingest.py
+│   ├── gray_scale.py
+│   ├── normalize.py
+│   └── preprocess.py          ← add this
+│   └── quality.py             ← add this
+│
+├── ocr/                        ← add this folder
+│   ├── __init__.py
+│   ├── engine.py
+│   └── extractor.py
+│
+├── pipeline/                   ← add this folder
+│   ├── __init__.py
+│   ├── runner.py
+│   └── events.py
+│              
+├── api/                        ← add this folder (FastAPI)
+│   ├── __init__.py
+│   ├── main.py                 ← FastAPI app entry point
+│   ├── routes/
+│   │   ├── invoices.py         ← GET/PUT/DELETE /invoices
+│   │   ├── batch.py            ← POST /invoices/batch  
+│   │   └── corrections.py      ← POST /corrections
+│   └── schemas.py              ← Pydantic request/response models
+│
+├── storage/                    ← add this folder   
+│   ├── __init__.py
+│   ├── postgres.py
+│   └── clickhouse.py
+│
+├── scripts/
+│   └── run_batch.py            ← already here
+│   
+├── static/                     ← already here
+│   ├── index.html
+│   └── main.js
+│
+├── review.html                 ← move to static/ later
+├── README.md
+├── docker-compose.yml          ← add this
+├── requirements.txt            ← add this
+└── .gitignore                  ← add this, data/ goes in here
