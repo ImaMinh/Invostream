@@ -1,4 +1,5 @@
 from pydantic import BaseModel
 
 class BatchUploadResponse(BaseModel):
-    pass
+    batch_id: str
+    status: str
