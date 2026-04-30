@@ -15,12 +15,15 @@ function folder_form_upload_handler(event) {
     }
 }
 
+/**
+ * function for uploading folder files to fastapi backend
+ */
 async function upload_folder_data_handler() {
     try{
         const port = 8000;
         const url = `http://127.0.0.1:${port}/invoices/batch`
 
-        if(Folder_Form) {
+        if(Folder_Form) {   
             // -- get the file input element from the form --
             // -- read its file collection.
             // -- early-return if no files are selected.
@@ -38,6 +41,10 @@ async function upload_folder_data_handler() {
             };
 
             const response = await fetch(url, requestInit);
+
+            if(response.ok) {
+                alert("file upload successful");
+            }
             
         } else {
             throw new Error("cannot fetch folder form");

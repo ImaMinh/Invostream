@@ -1,11 +1,9 @@
 import os
-import uuid
 import traceback
-from fastapi import UploadFile, BackgroundTasks, File, HTTPException
+from fastapi import UploadFile, HTTPException
 
 # allowed file types
 allowed_types = ["image/jpeg", "image/png", "application/pdf"]
-
 
 async def save_files_to_disk(uploaded_files: list[UploadFile], batch_id = None) -> list[str]:
     """
@@ -47,3 +45,4 @@ async def save_files_to_disk(uploaded_files: list[UploadFile], batch_id = None) 
     except Exception as error: 
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(error))
+
