@@ -1,11 +1,12 @@
 import os
 import traceback
-from fastapi import UploadFile, HTTPException
+import uuid
+from fastapi import HTTPException
 
 # allowed file types
 allowed_types = ["image/jpeg", "image/png", "application/pdf"]
 
-async def save_files_to_disk(uploaded_files: list[UploadFile], batch_id = None) -> list[str]:
+async def save_files_to_disk(uploaded_files: list[tuple[str | None, bytes]], batch_id: str) -> list[str]:
     """
     function to save files to disk. Returns a list of saved file locations on the disk.
     """
@@ -14,35 +15,28 @@ async def save_files_to_disk(uploaded_files: list[UploadFile], batch_id = None) 
         save_dir = f"data/raw/{batch_id}"
         
         os.makedirs(save_dir)
-        
         paths = []
         
         # iterate over the files in the uploaded folder.
-        for file in uploaded_files:
+        for file_name, file_content in uploaded_files:
             
-            # TODO: flag back the file to send to user. 
-            if file.content_type not in allowed_types: 
-                continue  
+            if not (file_content and file_name):
+                continue
             
-            # read the file contents. 
-            contents = await file.read()
+            file_name = file_name.split("/").pop()
             
-            # strip the webkitRelativePath prefix:
-            curr_filename = str(file.filename)
-            file.filename = curr_filename.split("/").pop()
+            file_path = f"{save_dir}/{file_name}"
             
-            # create the filepath.
-            filepath = f"{save_dir}/{file.filename}"
-            
-            # TODO: this current webkitRelativePath prefix might work only with non-nested folders. Need to fix the full thing afterwards. 
+            with open(file_path, "wb") as f:
+                f.write(file_content)
 
-            with open(filepath, "wb") as f:
-                f.write(contents)
-
-            paths.append(filepath)
+            paths.append(file_path)
         
         return paths
+    
     except Exception as error: 
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(error))
 
+
+    

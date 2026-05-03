@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
 
 # import the modules:
-from pipeline.runner import pipeline_runner
+from pipeline.batch import batch_setup
 
 # import pydantic models
 from models.batch import BatchUploadResponse
@@ -30,13 +30,17 @@ app.add_middleware(
 )
 
 # === API for orchestrating files from `Upload Folder` === #
-@router.post("/invoices/batch")
+@router.post("/invoices/batch", response_model=BatchUploadResponse)
 async def ingest(background_tasks: BackgroundTasks, folder: list[UploadFile] = File(...)): # TODO: define a response model here.
     try:
-        # response = await pipeline_runner(folder)
-        batch_id = str(uuid.uuid4())
-        background_tasks.add_task(pipeline_runner, folder, batch_id)
-        # return a response here.
+        # --- read the bytes from HTTP ---
+        files_bytes = [(f.filename, await f.read()) for f in folder]
+        
+        # --- run the pipeline in background ---
+        batch_id = await batch_setup(files_bytes, background_tasks)
+       
+        # return process response
+        return BatchUploadResponse(batch_id=batch_id, status="pending")
     except ValidationError as validationError: 
         print('Validation error occured', validationError) 
         raise HTTPException(status_code=422, detail=str(validationError))
