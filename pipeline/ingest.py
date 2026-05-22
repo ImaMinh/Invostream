@@ -9,6 +9,9 @@ allowed_types = ["image/jpeg", "image/png", "application/pdf"]
 async def save_files_to_disk(uploaded_files: list[tuple[str | None, bytes]], batch_id: str) -> list[str]:
     """
     function to save files to disk. Returns a list of saved file locations on the disk.
+    Args:
+        uploaded_files: file bytes read from API layer.
+        batch_id: batch ID generated from batch setup.
     """
     try:
         # data raw, originally uploaded. 

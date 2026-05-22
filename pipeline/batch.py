@@ -18,12 +18,3 @@ async def batch_setup(files: list[tuple[str | None, bytes]], background_tasks: B
     background_tasks.add_task(pipeline_runner, file_paths, batch_id)
     
     return batch_id
-
-def script():
-    pass 
-
-def setup_processes(file_paths):
-    with ProcessPoolExecutor(max_workers=os.cpu_count()) as executor:
-        result = executor.map(script, file_paths, chunksize=1)
-        return result
-        
