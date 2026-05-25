@@ -26,5 +26,5 @@ def threshold(file_paths: list[str], batch_id: str):
         print(f'thresholded image {image_path} saved to:', save_path)
         
         thresholded_paths.append(save_path)
-    
+        
     return thresholded_paths

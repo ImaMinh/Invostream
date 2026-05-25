@@ -1,8 +1,7 @@
 import os
 import cv2
 
-def denoise(file_paths: list[str], batch_id: str):
-    
+def denoise(file_paths: list[str], batch_id: str) -> list[str]:
     save_dir = f"data/denoised/{batch_id}"
     os.makedirs(save_dir)
     
@@ -18,13 +17,15 @@ def denoise(file_paths: list[str], batch_id: str):
             print(f'failed to read image: {image_path}')
             continue
         
-        denoised_image = cv2.fastNlMeansDenoising(
-            image,
-            None,
-            h=10,
-            templateWindowSize=7,
-            searchWindowSize=21
-        )
+        # denoised_image = cv2.fastNlMeansDenoising(
+        #     image,
+        #     None,
+        #     h=10,
+        #     templateWindowSize=7,
+        #     searchWindowSize=21
+        # )
+        
+        denoised_image = cv2.medianBlur(image, ksize=3)
         
         cv2.imwrite(save_path, denoised_image)
         print(f'denoised image {image_path} saved to:', save_path)

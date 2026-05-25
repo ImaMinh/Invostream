@@ -11,7 +11,7 @@ from image_process.deskew_step import deskew_images
 from image_process.adaptive_thresholding import threshold
 from image_process.denoise import denoise
 
-async def ingest_image(file_paths: list[str], batch_id: str):
+async def ingest_image(file_paths: list[str], batch_id: str) -> list[str] | None:
     try:
         print("received batch: ", batch_id)  
         
@@ -23,6 +23,8 @@ async def ingest_image(file_paths: list[str], batch_id: str):
         
         thresholds_paths = threshold(deskewed_paths, batch_id)
         
-        denoised_pahts = denoise(thresholds_paths, batch_id)
+        denoised_paths = denoise(thresholds_paths, batch_id)
+        
+        return denoised_paths
     except:
         pass
