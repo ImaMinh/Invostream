@@ -2,3 +2,5 @@
 .github/
 .vscode/
 .env
+.agents/
+.claude/
