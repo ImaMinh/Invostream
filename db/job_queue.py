@@ -42,18 +42,45 @@ async def enqueue_jobs(batch_id: str, file_paths: list[str]):
     except Exception as e:
         print(f"failed to enqueue jobs for batch {batch_id}: {e}")
         raise
+    
+async def add_jobs(batch_id: str, file_path: str, table_name: str = 'job_queue'):
+    """
+    function to add a sigle job to the queue.
+    """
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            if db is None:
+                raise RuntimeError("Database connection failed.")
+            
+            job_id = f"{batch_id}_{file_path}"
+            await db.execute(
+                f"INSERT OR IGNORE INTO {table_name} (id, batch_id, file_path, status) VALUES (?, ?, ?, ?)",
+                (job_id, batch_id, file_path, "pending")
+            )
+            await db.commit()
+            print(f"<ADD JOB> enqueued {file_path} into table {table_name}")
+    except Exception as e:
+        print(f"failed to add job for batch {batch_id}: {e}")
+        raise
+    
+async def remove_job(job_id: str, table_name: str = 'job_queue'):
+    """
+    function to remove a job from the queue.
+    """
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            if db is None:
+                raise RuntimeError("Database connection failed.")
+            
+            await db.execute(
+                f"DELETE FROM {table_name} WHERE id = ?",
+                (job_id,)
+            )
+            await db.commit()
+            print(f"<REMOVE JOB> removed job {job_id} from table {table_name}")
+    except Exception as e:
+        print(f"failed to remove job {job_id}: {e}")
+        raise   
+    
 
-# async def update_job_status(job_id: str, status: str):
-#     async with aiosqlite.connect(DB_PATH) as db:
-#         await db.execute(
-#             "UPDATE jobs SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-#             (status, job_id)
-#         )
-#         await db.commit()
-
-# async def get_jobs_by_batch(batch_id: str):
-#     async with aiosqlite.connect(DB_PATH) as db:
-#         async with db.execute(
-#             "SELECT * FROM jobs WHERE batch_id = ?", (batch_id,)
-#         ) as cursor:
-#             return await cursor.fetchall()
+    

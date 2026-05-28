@@ -1,24 +1,22 @@
 import os
 from PIL import Image
 
-def grayscale(file_paths: list[str], batch_id: str):
-    
-    save_dir = f"data/grayscaled/{batch_id}"
-    os.makedirs(save_dir)
-    
-    grayscaled_paths = []
-    
-    for image_path in file_paths:
-        filename = os.path.basename(image_path)
+def grayscale(file_path: str, batch_id: str):
+    try:
+        save_dir = f"data/grayscaled/{batch_id}"
+        os.makedirs(save_dir, exist_ok=True)
+        
+        filename = os.path.basename(file_path)
         save_path = f"{save_dir}/{filename}"
-    
-        image = Image.open(image_path)
+        
+        image = Image.open(file_path)
         
         grayscaled_image = image.convert('L')
         grayscaled_image.save(save_path)
         
-        print(f'saved grayscaled image {image_path} to:', save_path)
+        print(f'saved grayscaled image {file_path} to:', save_path)
         
-        grayscaled_paths.append(save_path)
-        
-    return grayscaled_paths
+        return save_path
+    except Exception as e:
+        print(f"<--GRAYSCALE IMAGE> Error grayscaling image {file_path} in batch {batch_id}: {e}")
+        raise

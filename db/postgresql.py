@@ -1,128 +1,82 @@
 import os
 import asyncpg  
 from dotenv import load_dotenv
-    
-_pool = None
 
-async def init_pool():
+
+_pool: asyncpg.Pool | None = None # pool variable to hold the connection pool instance
+
+# ====== Database Connection Pool Management =====
+
+# ---- Connection Pool Initialization ----
+async def init_db_pool()->None:
     """
-    Initializes the connection pool.
+    Initialized the DB connection pool. Should be called once at the start of the application.
+    A connection pool is a cache of database connections maintained so that the connections can be reused when future requests to the database are required. 
+    """
+    try: 
+        global _pool
+        if _pool is None:
+            load_dotenv()  
+            
+            dsn = os.getenv("DATABASE_URL")
+            if not dsn:
+                raise ValueError("<-- INIT DB POOL --> DATABASE_URL not found in environment variables.")
+            
+            _pool = await asyncpg.create_pool(dsn, min_size=1, max_size=10)
+            
+            print("Database connection pool initialized.")
+    except Exception as e:
+        print(f"<--INIT_DB_POOL--> Error initializing database connection pool: {e}")
+        raise
+
+# ---- Close Pool Connection ----
+async def close_db_pool()->None:
+    """
+    Closes the database connection pool. Should be called when the application is shutting down.
     """
     try:
         global _pool
-        
-        load_dotenv()
-        
-        print("USER:", os.getenv("POSTGRES_USER"))
-        print("PASS:", os.getenv("POSTGRES_PASSWORD"))
-        print("DB:", os.getenv("POSTGRES_DB"))
-        print("HOST:", os.getenv("POSTGRES_HOST"))
-        print("PORT:", os.getenv("POSTGRES_PORT"))
-
-        _pool = await asyncpg.create_pool(
-            user = os.getenv("POSTGRES_USER"),
-            password = os.getenv("POSTGRES_PASSWORD"),
-            database = os.getenv("POSTGRES_DB"),
-            host = os.getenv("POSTGRES_HOST"),
-            port = os.getenv("POSTGRES_PORT", "5432"),
-            min_size = 1,
-            max_size = 10
-        )
-        
-        await _create_table()
-    except Exception as e:
-        print(f"Error initializing pool: {e}")
-        raise
-    
-async def close_pool():
-    """
-    Closes the connection pool.
-    """
-    try:
         if _pool is not None:
             await _pool.close()
+            _pool = None
+            print("Database connection pool closed.")
     except Exception as e:
-        print(f"Error closing pool: {e}")
-        raise
-        
-def get_pool():
-    """
-    Returns the connection pool. Raise if init_pool() has not been called.
-    """
-    try: 
-        if _pool is None:
-            raise RuntimeError("Database pool not initialized - call init_pool() first.")
-        return _pool
-    except Exception as e:
-        print(e)
+        print(f"<--CLOSE_DB_POOL--> Error closing database connection pool: {e}")
         raise
 
-async def _create_table():
+# ---- Get a Connection from Pool ----
+async def get_db_connection()-> asyncpg.Connection:
     """
-    Creates the main 'invoices' table with a comprehensive schema designed for global invoice data.
+    Acquires a single connection from the pool. 
+    Should be used within an async context manager to ensure proper release of the connection back to the pool.
     """
     try:
+        global _pool
         if _pool is None:
-            raise RuntimeError("Pool not initialized - call init_pool() first.")
-
-        async with _pool.acquire() as connection:   
-                await connection.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto;")
-
-                await connection.execute(   
-                    """
-                    CREATE TABLE IF NOT EXISTS invoices (
-                    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-
-                    -- Source tracking
-                    job_id          TEXT NOT NULL UNIQUE,
-                    filename        TEXT NOT NULL,
-                    file_hash       TEXT,                              -- SHA256 of source file, for dedup
-
-                    -- Pipeline state
-                    status          TEXT NOT NULL
-                                    CHECK (status IN ('success', 'review', 'failed')),
-
-                    -- Extractor metadata
-                    model_used      TEXT NOT NULL,                     -- 'azure_prebuilt', 'paddleocr_v1', 'gemini'
-                    template_name   TEXT,                              -- optional template label
-                    ocr_confidence  FLOAT CHECK (ocr_confidence BETWEEN 0 AND 1),
-
-                    -- Jurisdiction (globally aware)
-                    country_code    CHAR(2),                           -- ISO 3166-1 alpha-2: VN, US, JP, ...
-                    currency        CHAR(3),                           -- ISO 4217: VND, USD, JPY, ...
-
-                    -- Parties
-                    vendor_name     TEXT,
-                    vendor_tax_code TEXT,
-                    buyer_name      TEXT,
-                    buyer_tax_code  TEXT,
-
-                    -- Identifiers + dates
-                    invoice_number  TEXT,
-                    invoice_date    DATE,
-                    due_date        DATE,
-
-                    -- Amounts (NUMERIC(20,4) covers every fiat currency, including 3-decimal ones)
-                    subtotal        NUMERIC(20, 4),
-                    tax_amount      NUMERIC(20, 4),
-                    total_amount    NUMERIC(20, 4),
-                    amount_due      NUMERIC(20, 4),
-
-                    -- Terms
-                    payment_term    TEXT,
-
-                    -- Catch-all for model-specific or country-specific fields
-                    raw_fields      JSONB,                             -- nullable: failed invoices may have nothing
-
-                    -- Why something failed or needs review (free-text or structured later)
-                    failure_reason  TEXT,
-
-                    -- Audit
-                    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-                    processed_at    TIMESTAMPTZ
-                );
-                """
-            )
+            raise ValueError("Database connection pool is not initialized. Call init_db_pool() first.")
+        
+        proxy: asyncpg.pool.PoolConnectionProxy = await _pool.acquire()
+        connection = proxy._con  # Access the underlying connection from the proxy
+        
+        if connection is None:
+            raise ValueError("Failed to acquire a database connection from the pool.")
+        
+        return connection
+            
     except Exception as e:
-        print(f"Error creating table: {e}")
+        print(f"<--GET_DB_CONNECTION--> Error acquiring database connection from pool: {e}")
+        raise
+
+# ====== Database Query Functions ======
+
+# ---- DB Insert Function ----
+async def insert_invoice_to_db(batch_id: str, extracted_data:dict, image_path: str):
+    try: 
+        connection = await get_db_connection()
+        try:
+            pass
+        finally:
+            await connection.close()  # Ensure the connection is released back to the pool
+    except Exception as e:
+        print(f"<--INSERT_INVOICE_TO_DB--> Error inserting invoice into database for batch {batch_id} and image {image_path}: {e}")
         raise

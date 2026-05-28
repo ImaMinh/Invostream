@@ -3,14 +3,14 @@ import numpy as np
 from PIL import Image
 from deskew import determine_skew
 
-def deskew_images(file_paths: list[str], batch_id: str):
-    
-    save_dir = f"data/deskewed/{batch_id}"
-    os.makedirs(save_dir)
-    
-    deskewed_paths = []
-    
-    for image_path in file_paths:
+def deskew_images(image_path: str, batch_id: str):
+    """
+    Deskews the input image and saves it to the deskewed directory for the batch.
+    """
+    try:
+        save_dir = f"data/deskewed/{batch_id}"
+        os.makedirs(save_dir, exist_ok=True)
+        
         filename = os.path.basename(image_path)
         save_path = f"{save_dir}/{filename}"
         
@@ -32,6 +32,7 @@ def deskew_images(file_paths: list[str], batch_id: str):
             deskewed_image.save(save_path)
             print(f'deskewed image {image_path} (angle: {angle:.2f}) saved to:', save_path)
         
-        deskewed_paths.append(save_path)
-    
-    return deskewed_paths
+        return save_path
+    except Exception as e:
+        print(f"<--DESKEW IMAGE> Error deskewing image {image_path} in batch {batch_id}: {e}")
+        raise
