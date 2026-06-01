@@ -18,7 +18,7 @@ async def pipeline_runner(file_paths: list[str], batch_id):
         
         # -- 3rd task, send the processed paths over to OCR extraction --
         try: 
-            extraction_results = await extract_invoices(processed_images_paths, batch_id)
+            extraction_results = extract_invoices(processed_images_paths, batch_id)
             print(f"<PIPELINE RUNNER> successfully received extraction results for batch {batch_id}: {extraction_results}")
         except Exception as e:
             print(f"Error extracting invoices from {processed_images_paths} in batch {batch_id}: {e}")

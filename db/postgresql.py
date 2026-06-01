@@ -2,6 +2,9 @@ import os
 import asyncpg  
 from dotenv import load_dotenv
 
+# import invoice data model
+from models.invoice import Invoice
+
 
 _pool: asyncpg.Pool | None = None # pool variable to hold the connection pool instance
 
@@ -70,11 +73,24 @@ async def get_db_connection()-> asyncpg.Connection:
 # ====== Database Query Functions ======
 
 # ---- DB Insert Function ----
-async def insert_invoice_to_db(batch_id: str, extracted_data:dict, image_path: str):
+async def insert_invoice_to_db(batch_id: str, extracted_data: Invoice, image_path: str):
     try: 
         connection = await get_db_connection()
         try:
-            pass
+            query = """
+                INSERT INTO invoices (batch_id, invoice_number, invoice_date, total_amount, vendor_name, image_path)
+                VALUES ($1, $2, $3, $4, $5, $6)
+            """
+            await connection.execute(
+                query,
+                batch_id,
+                extracted_data.invoice_number,
+                extracted_data.invoice_date,
+                extracted_data.total_amount,
+                extracted_data.vendor_name,
+                image_path
+            )
+            print(f"Inserted invoice into database for batch {batch_id} and image {image_path}")
         finally:
             await connection.close()  # Ensure the connection is released back to the pool
     except Exception as e:

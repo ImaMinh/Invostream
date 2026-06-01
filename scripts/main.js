@@ -39,7 +39,7 @@ async function upload_folder_data_handler() {
                 method: "POST",
                 body: formData
             };
-
+            
             const response = await fetch(url, requestInit);
 
             if(response.ok) {

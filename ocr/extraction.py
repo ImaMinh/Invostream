@@ -68,7 +68,7 @@ LINE_ITEM_FIELD_MAP = {
 }
 
 # --- Azure Document Intelligence Client Initialization ---
-async def init_azure_client()->DocumentIntelligenceClient:
+def init_azure_client()->DocumentIntelligenceClient:
     """
     Initializes the Azure Document Intelligence client using credentials from environment variables.
     Returns an instance of DocumentIntelligenceClient.
@@ -136,18 +136,34 @@ def get_field_value(field: DocumentField):
 def _extract_line_items(items_field: DocumentField, invoice_job_id: str, sub_map: dict) -> list[InvoiceLineItem]:
     """Build InvoiceLineItem objects from Azure's Items array field."""
     line_items: list[InvoiceLineItem] = []
-    rows = items_field.value_array or []
+
+    # 1. Get the rows, tolerating both the SDK object and the raw dict form
+    if isinstance(items_field, dict):
+        rows = items_field.get("valueArray") or []
+    else:
+        rows = getattr(items_field, "value_array", None) or []
+
+    # 2. Enumerate through the rows and extract the sub-fields based on the sub_map, which maps Azure's field names to our InvoiceLineItem model's field names.
     for i, row in enumerate(rows):
-        # each row is a DocumentField of type "object"; its value_object is dict[str, DocumentField]
-        cells = row.value_object or {}
+        # unwrap the cell dict
+        if isinstance(row, dict):
+            cells = row.get("valueObject") or {}
+        else:
+            cells = getattr(row, "value_object", None) or {}
+
         item_data = {}
         for az_name, target in sub_map.items():
             cell = cells.get(az_name)
             if cell is not None:
                 item_data[target] = get_field_value(cell)
+
+        if not item_data:        # skip empty/garbage rows like row[0]
+            continue
+
         line_items.append(
             InvoiceLineItem(invoice_id=invoice_job_id, line_number=i + 1, **item_data)
         )
+    
     return line_items
 
 # -- Main extraction function that takes in a file path and the Azure client, and returns an Invoice object with the extracted data --
@@ -214,7 +230,8 @@ def extract(batch_id: str, file_path: str, document_intelligence_client: Documen
                 status=status,
                 template_name=analyzed_result.model_id,
                 **mapped,
-                raw_fields=raw_fields
+                raw_fields=raw_fields,
+                line_items=line_items
             )
     except Exception as e: 
         # catch the error and return a failed Invoice object signaling a failed extraction, so that the pipeline can continue processing other files in the batch
@@ -222,23 +239,28 @@ def extract(batch_id: str, file_path: str, document_intelligence_client: Documen
         return Invoice(
             job_id=job_id,
             file_name=file_name,
-            status="failed"
+            status="failed",
+            raw_fields=raw_fields,
+            line_items=line_items if 'line_items' in locals() else []
         )
         
     
-async def extract_invoices(file_paths: list[str], batch_id: str)->list[Invoice]:
+def extract_invoices(file_paths: list[str], batch_id: str)->list[Invoice]:
     """
     extract invoices for a process batch. Returns a list of extracted invoices as Invoice objects.
     """
     try:
         # 1. initialize Azure Document Intelligence client once for the batch, then reuse for all files in the batch
-        document_intelligence_client = await init_azure_client() 
+        document_intelligence_client = init_azure_client() 
         
         # 2. loop through the file paths, extract each invoice, and collect the results in a list.
         extracted_invoices: list[Invoice] = []
         for file_path in file_paths:
             extracted_result = extract(batch_id, file_path, document_intelligence_client=document_intelligence_client)
-            if(extracted_result is not None): print(f"<--Extraction.py--> received extracted invoice from file {file_path} with status: {extracted_result.status}")
+            if(extracted_result):
+                print(f"<--Extraction.py--> Successfully extracted invoice from file {file_path} with job id {extracted_result.job_id}")
+            else: 
+                print(f"<--Extraction.py--> Extraction returned None for file {file_path}")
             extracted_invoices.append(extracted_result)
         
         return extracted_invoices

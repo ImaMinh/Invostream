@@ -5,7 +5,8 @@ CREATE TABLE invoices (
     -- Identifiers / tracking
     job_id VARCHAR(255) NOT NULL,
     file_name VARCHAR(255) NOT NULL,
-    status VARCHAR(50) NOT NULL CHECK (status IN ('success', 'review', 'failed')),
+    -- status of the invoice processing: 'success', 'review', 'failed'.
+    status VARCHAR(50) NOT NULL CHECK (status IN ('success', 'review', 'failed')), 
     template_name VARCHAR(255),
 
     -- Geographical and financial information
