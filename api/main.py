@@ -1,4 +1,6 @@
 # import FastAPI modules 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, UploadFile, HTTPException, APIRouter, File, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware  
 
@@ -13,15 +15,28 @@ from models.batch import BatchUploadResponse
 
 import uuid
 
+# import database connection pool management functions
+from db.postgresql import init_db_pool, close_db_pool, get_db_connection
+
+# --- life cycle management for the database connection pool ---
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Lifespan function to manage the database connection pool.
+    """
+    await init_db_pool()    # runs once when the app starts
+    yield                   # app runs here, handling requests
+    await close_db_pool()   # runs once when the app shuts down
+
 # --- initiate the application ---
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
 router = APIRouter()
 
 
 # configure CORS networks #
 allowed_origins = ['http://127.0.0.1:5500']
 
-# configure the app middle ware (traffic control layer (ASGI specification)) #
+# -- configure the app middle ware (traffic control layer (ASGI specification)) --- #
 app.add_middleware( 
     CORSMiddleware,
     allow_origins = allowed_origins,

@@ -1,7 +1,8 @@
 
-from db.job_queue import enqueue_jobs
+from db.sqlite.job_queue import enqueue_jobs
 from image_process.ingest import ingest_image
 from ocr.extraction import extract_invoices
+from db.postgresql.postgresql import insert_invoice_to_db
 
 async def pipeline_runner(file_paths: list[str], batch_id):
     """
@@ -19,10 +20,19 @@ async def pipeline_runner(file_paths: list[str], batch_id):
         # -- 3rd task, send the processed paths over to OCR extraction --
         try: 
             extraction_results = extract_invoices(processed_images_paths, batch_id)
-            print(f"<PIPELINE RUNNER> successfully received extraction results for batch {batch_id}: {extraction_results}")
+            print(f"<PIPELINE RUNNER> successfully received extraction results for batch {batch_id}: ex.: {extraction_results[0]}")
         except Exception as e:
             print(f"Error extracting invoices from {processed_images_paths} in batch {batch_id}: {e}")
-            
+        
+        # -- 4th task, send the extracted data over to db insertion --
+        for extracted_data in extraction_results:
+            try: 
+                invoice_uuid = await insert_invoice_to_db(batch_id, extracted_data)
+                print(f"<PIPELINE RUNNER> successfully inserted invoice with UUID {invoice_uuid} into database for batch {batch_id} and image {extracted_data.file_name}")
+            except Exception as e:
+                print(f"Error inserting invoice data into database for batch {batch_id} and image {extracted_data.file_name}: {e}")
+                continue  # Continue processing the next invoice even if one fails
+         
         # create multi-processors tasks.
         # multi-processors tasks takes over the logic.
         # receives the results from multi-processors tasks. 

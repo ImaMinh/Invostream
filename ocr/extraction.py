@@ -195,10 +195,11 @@ def extract(batch_id: str, file_path: str, document_intelligence_client: Documen
         extracted_invoice = documents[0]
         raw_fields = {}
         mapped = {}
+        line_items = []
         
         # 2. Loop through all the fields returned by Azure, and extract the value and confidence score for each field.
         # Flag the invoice for review if any field has a confidence score below the threshold (e.g. 0.8). The threshold can be adjusted based on requirements.
-        if(extracted_invoice.fields):
+        if extracted_invoice.fields:
             for field_name, field_value in extracted_invoice.fields.items():
                 raw_fields[field_name] = {
                     "value": field_value.content,
@@ -223,16 +224,20 @@ def extract(batch_id: str, file_path: str, document_intelligence_client: Documen
                 confidence = field_value.confidence
                 if confidence is None or confidence < 0.8:
                     status = "review"
-            
-            return Invoice(
-                job_id=job_id,
-                file_name=file_name,
-                status=status,
-                template_name=analyzed_result.model_id,
-                **mapped,
-                raw_fields=raw_fields,
-                line_items=line_items
-            )
+        else:
+            # Azure returned a document but with no fields — flag for review
+            status = "review"
+        
+        # ← return is now OUTSIDE the if-block, so it always executes
+        return Invoice(
+            job_id=job_id,
+            file_name=file_name,
+            status=status,
+            template_name=analyzed_result.model_id,
+            **mapped,
+            raw_fields=raw_fields,
+            line_items=line_items
+        )
     except Exception as e: 
         # catch the error and return a failed Invoice object signaling a failed extraction, so that the pipeline can continue processing other files in the batch
         print(f"<--Extraction.py--> Error extracting invoice from file {file_path}: {e}")
@@ -240,7 +245,7 @@ def extract(batch_id: str, file_path: str, document_intelligence_client: Documen
             job_id=job_id,
             file_name=file_name,
             status="failed",
-            raw_fields=raw_fields,
+            raw_fields=raw_fields if 'raw_fields' in locals() else {},
             line_items=line_items if 'line_items' in locals() else []
         )
         

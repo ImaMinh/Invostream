@@ -16,7 +16,7 @@ async def save_files_to_disk(uploaded_files: list[tuple[str | None, bytes]], bat
     try:
         # data raw, originally uploaded. 
         save_dir = f"data/raw/{batch_id}"
-        
+
         os.makedirs(save_dir)
         paths = []
         
@@ -25,19 +25,19 @@ async def save_files_to_disk(uploaded_files: list[tuple[str | None, bytes]], bat
             
             if not (file_content and file_name):
                 continue
-            
+
             file_name = file_name.split("/").pop()
             
             file_path = f"{save_dir}/{file_name}"
-            
+
             with open(file_path, "wb") as f:
                 f.write(file_content)
 
             paths.append(file_path)
-        
+
         return paths
-    
-    except Exception as error: 
+
+    except Exception as error:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(error))
 
