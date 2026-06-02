@@ -1,6 +1,9 @@
 import os
 from PIL import Image
 
+# TODO: we might want to add some error handling here, e.g. if the image file is corrupted or if the save operation fails, we should catch those exceptions and handle them appropriately (e.g. log the error, skip the file, etc.)
+# TODO: this doesn't work with pdf paths.
+
 def normalize_dpi(image_path: str, batch_id: str, target_dpi=300):
     save_dir = f"data/normalized/{batch_id}"
     os.makedirs(save_dir, exist_ok=True)

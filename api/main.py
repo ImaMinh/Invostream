@@ -16,7 +16,7 @@ from models.batch import BatchUploadResponse
 import uuid
 
 # import database connection pool management functions
-from db.postgresql import init_db_pool, close_db_pool, get_db_connection
+from db.postgresql.pool import init_db_pool, close_db_pool, get_db_connection
 
 # --- life cycle management for the database connection pool ---
 @asynccontextmanager

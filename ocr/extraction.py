@@ -267,9 +267,14 @@ def extract_invoices(file_paths: list[str], batch_id: str)->list[Invoice]:
             else: 
                 print(f"<--Extraction.py--> Extraction returned None for file {file_path}")
             extracted_invoices.append(extracted_result)
-        
         return extracted_invoices
     except Exception as e:
+        # TODO: we might want to handle this differently depending on the use case  
+        # if the Azure client initialization fails, 
+        # it might make sense to fail the entire batch instead of returning empty/failed invoices,
+        # since it's likely that all extractions will fail without a client. For now, we will just log the error and re-raise it to be handled by the caller.
+        
+        
         print(f"<--Extraction.py--> Error extracting invoices for batch {batch_id}: {e}")
         raise
     finally:    

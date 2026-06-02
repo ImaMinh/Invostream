@@ -2,7 +2,7 @@
 from db.sqlite.job_queue import enqueue_jobs
 from image_process.ingest import ingest_image
 from ocr.extraction import extract_invoices
-from db.postgresql.postgresql import insert_invoice_to_db
+from db.postgresql.invoices import insert_invoice
 
 async def pipeline_runner(file_paths: list[str], batch_id):
     """
@@ -27,7 +27,7 @@ async def pipeline_runner(file_paths: list[str], batch_id):
         # -- 4th task, send the extracted data over to db insertion --
         for extracted_data in extraction_results:
             try: 
-                invoice_uuid = await insert_invoice_to_db(batch_id, extracted_data)
+                invoice_uuid = await insert_invoice(extracted_data)
                 print(f"<PIPELINE RUNNER> successfully inserted invoice with UUID {invoice_uuid} into database for batch {batch_id} and image {extracted_data.file_name}")
             except Exception as e:
                 print(f"Error inserting invoice data into database for batch {batch_id} and image {extracted_data.file_name}: {e}")

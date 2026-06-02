@@ -1,11 +1,11 @@
 """
 Database connection pool management for PostgreSQL using asyncpg.
 """
-
-import json
 import os
 import asyncpg
 from dotenv import load_dotenv
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator
 
 _pool: asyncpg.Pool | None = None # pool variable to hold the connection pool instance
 
@@ -51,24 +51,14 @@ async def close_db_pool()->None:
         raise
     
 # ---- Get a Connection from Pool ----
-async def get_db_connection()-> asyncpg.Connection:
+@asynccontextmanager
+async def get_db_connection()-> AsyncGenerator[asyncpg.Connection, None]: # @asynccontextmanager returns an AsyncGenerator
     """
     Acquires a single connection from the pool. 
     Should be used within an async context manager to ensure proper release of the connection back to the pool.
     """
-    try:
-        global _pool
-        if _pool is None:
-            raise ValueError("Database connection pool is not initialized. Call init_db_pool() first.")
-        
-        proxy: asyncpg.pool.PoolConnectionProxy = await _pool.acquire()
-        connection = proxy._con  # Access the underlying connection from the proxy
-        
-        if connection is None:
-            raise ValueError("Failed to acquire a database connection from the pool.")
-        
-        return connection
-            
-    except Exception as e:
-        print(f"<--GET_DB_CONNECTION--> Error acquiring database connection from pool: {e}")
-        raise
+    if _pool is None:
+        raise ValueError("Database connection pool is not initialized. Call init_db_pool() first.")
+    
+    async with _pool.acquire() as connection:
+        yield connection
