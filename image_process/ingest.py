@@ -3,8 +3,18 @@ from image_process.grayscale import grayscale
 from image_process.deskew_step import deskew_images
 from image_process.adaptive_thresholding import threshold
 from image_process.denoise import denoise
+import os
 
 def process_image(image_path: str, batch_id: str):
+     # 1. Extract the file extension
+    ext = os.path.splitext(image_path)[1].lower()
+
+    # 2. If it's a PDF, DO NOT touch it with OpenCV. Azure loves raw PDFs.
+    if ext == ".pdf":
+        print(f"<INGEST IMAGE -- IMAGE PROCESS> Skipping preprocessing for PDF: {image_path}")
+        return image_path
+
+    # 3. if it's an image file, proceed with the following preprocessing steps:
     path = normalize_dpi(image_path, batch_id, target_dpi=300)
     path = grayscale(path, batch_id)
     path = deskew_images(path, batch_id)

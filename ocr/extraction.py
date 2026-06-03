@@ -254,8 +254,10 @@ def extract_invoices(file_paths: list[str], batch_id: str)->list[Invoice]:
     """
     extract invoices for a process batch. Returns a list of extracted invoices as Invoice objects.
     """
+    pid = os.getpid()
     try:
         # 1. initialize Azure Document Intelligence client once for the batch, then reuse for all files in the batch
+        print(f"[PID: {pid}] 🔄 Initializing Azure Document Intelligence Client...")
         document_intelligence_client = init_azure_client() 
         
         # 2. loop through the file paths, extract each invoice, and collect the results in a list.
@@ -263,9 +265,9 @@ def extract_invoices(file_paths: list[str], batch_id: str)->list[Invoice]:
         for file_path in file_paths:
             extracted_result = extract(batch_id, file_path, document_intelligence_client=document_intelligence_client)
             if(extracted_result):
-                print(f"<--Extraction.py--> Successfully extracted invoice from file {file_path} with job id {extracted_result.job_id}")
+                print(f"[PID: {pid}] ✔️ <--Extraction.py--> Successfully extracted invoice from file {file_path} with job id {extracted_result.job_id}")
             else: 
-                print(f"<--Extraction.py--> Extraction returned None for file {file_path}")
+                print(f"[PID: {pid}] ⚠️ <--Extraction.py--> Extraction returned None for file {file_path}")
             extracted_invoices.append(extracted_result)
         return extracted_invoices
     except Exception as e:

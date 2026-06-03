@@ -8,12 +8,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
 
 # import the modules:
-from pipeline.batch import batch_setup
+from pipeline import pipeline_ingest
+from pipeline.batch import main_process
 
 # import pydantic models
 from models.batch import BatchUploadResponse
 
 import uuid
+import asyncio
 
 # import database connection pool management functions
 from db.postgresql.pool import init_db_pool, close_db_pool, get_db_connection
@@ -25,6 +27,7 @@ async def lifespan(app: FastAPI):
     Lifespan function to manage the database connection pool.
     """
     await init_db_pool()    # runs once when the app starts
+    asyncio.create_task(main_process()) # initialize the infinite listener loop in the background
     yield                   # app runs here, handling requests
     await close_db_pool()   # runs once when the app shuts down
 
@@ -45,17 +48,12 @@ app.add_middleware(
 )
 
 # === API for orchestrating files from `Upload Folder` === #
-@router.post("/invoices/batch", response_model=BatchUploadResponse)
-async def ingest(background_tasks: BackgroundTasks, folder: list[UploadFile] = File(...)): # TODO: define a response model here.
+@router.post("/invoices/batch")
+async def ingest(folder: list[UploadFile] = File(...)): # TODO: define a response model here.
     try:
-        # --- read the bytes from HTTP ---
-        files_bytes = [(f.filename, await f.read()) for f in folder]
-        
-        # --- run the pipeline in background ---
-        batch_id = await batch_setup(files_bytes, background_tasks)
-       
-        # return process response
-        return BatchUploadResponse(batch_id=batch_id, status="pending")
+        # pass the uploaded HTTP files to the pipeline ingest module.
+        await pipeline_ingest.ingest(folder)
+        return BatchUploadResponse(status="pending")
     except ValidationError as validationError: 
         print('Validation error occured', validationError) 
         raise HTTPException(status_code=422, detail=str(validationError))
