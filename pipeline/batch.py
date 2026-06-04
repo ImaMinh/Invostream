@@ -7,6 +7,7 @@ from fastapi import HTTPException
 import traceback
 import asyncio
 from db.postgresql.invoices import insert_invoice
+from db.clickhouse.analytics import insert_analytics
 from db.sqlite.job_queue import enqueue_jobs
 from pipeline.runner import worker_process
 from models.invoice import Invoice
@@ -84,8 +85,11 @@ async def handle_worker_result(future: asyncio.Future, batch_id: str):
                 invoice = Invoice(**extracted_data)   # dict → model
                 invoice_uuid = await insert_invoice(invoice)
                 print(f"<PIPELINE RUNNER> successfully inserted invoice with UUID {invoice_uuid} into database for batch {batch_id} and image {invoice.file_name}")
+                
+                # --- Dual Write: insert into ClickHouse analytics tables ---
+                insert_analytics(invoice, invoice_uuid, batch_id)
             except Exception as e:
-                print(f"Error inserting invoice data into database for batch {batch_id} and image {invoice.file_name}: {e}")
+                print(f"Error inserting invoice data into database for batch {batch_id}: {e}")
                 continue  # Continue processing the next invoice even if one fails
         JOB_QUEUE.task_done()
     except Exception as error:
