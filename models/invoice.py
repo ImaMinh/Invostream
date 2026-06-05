@@ -31,6 +31,8 @@ class Invoice(BaseModel):
     file_name: str
     # status can be: success, review, failed.
     status: str
+    # SHA-256 hash of the original file bytes, used for deduplication
+    content_hash: Optional[str] = None
 
     # invoice model and confidence scores
     template_name: Optional[str] = None

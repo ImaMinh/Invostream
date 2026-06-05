@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 
 # import necessary modules for Azure Document Intelligence
 from azure.core.credentials import AzureKeyCredential
-from azure.ai.documentintelligence import DocumentIntelligenceClient
+from azure.ai.documentintelligence.aio import DocumentIntelligenceClient
 from azure.ai.documentintelligence.models import DocumentField
 
 # import necessary modules and functions from other files
@@ -12,6 +12,8 @@ from models.invoice import Invoice, InvoiceLineItem
 
 # import Decimal for handling currency values
 from decimal import Decimal
+
+import asyncio
 
 
 # Globals
@@ -67,28 +69,28 @@ LINE_ITEM_FIELD_MAP = {
     "UnitPrice":   "unit_price",
 }
 
-# --- Azure Document Intelligence Client Initialization ---
-def init_azure_client()->DocumentIntelligenceClient:
-    """
-    Initializes the Azure Document Intelligence client using credentials from environment variables.
-    Returns an instance of DocumentIntelligenceClient.
-    """
-    try:
-        load_dotenv()
-        endpoint = os.getenv("DOCUMENTINTELLIGENCE_ENDPOINT")
-        key = os.getenv("DOCUMENTINTELLIGENCE_API_KEY")
+# # --- Azure Document Intelligence Client Initialization ---
+# def init_azure_client()->DocumentIntelligenceClient:
+#     """
+#     Initializes the Azure Document Intelligence client using credentials from environment variables.
+#     Returns an instance of DocumentIntelligenceClient.
+#     """
+#     try:
+#         load_dotenv()
+#         endpoint = os.getenv("DOCUMENTINTELLIGENCE_ENDPOINT")
+#         key = os.getenv("DOCUMENTINTELLIGENCE_API_KEY")
 
-        if(endpoint and key):
-            document_intelligence_client = DocumentIntelligenceClient(
-                endpoint=endpoint, credential=AzureKeyCredential(key)
-            )
-            print("<--Extraction.py--> Azure Document Intelligence client initialized successfully")
-            return document_intelligence_client
-        else:
-            raise ValueError(f"<--Extraction.py--> Cannot get environment variables: <key>: {key} and <endpoint>: {endpoint}")
-    except Exception as e:
-        print(f"<--Extraction.py--> Error initializing Azure Document Intelligence client: {e}")
-        raise
+#         if(endpoint and key):
+#             document_intelligence_client = DocumentIntelligenceClient(
+#                 endpoint=endpoint, credential=AzureKeyCredential(key)
+#             )
+#             print("<--Extraction.py--> Azure Document Intelligence client initialized successfully")
+#             return document_intelligence_client
+#         else:
+#             raise ValueError(f"<--Extraction.py--> Cannot get environment variables: <key>: {key} and <endpoint>: {endpoint}")
+#     except Exception as e:
+#         print(f"<--Extraction.py--> Error initializing Azure Document Intelligence client: {e}")
+#         raise
 
 # --- Invoice Extraction Function ---
 
@@ -167,7 +169,7 @@ def _extract_line_items(items_field: DocumentField, invoice_job_id: str, sub_map
     return line_items
 
 # -- Main extraction function that takes in a file path and the Azure client, and returns an Invoice object with the extracted data --
-def extract(batch_id: str, file_path: str, document_intelligence_client: DocumentIntelligenceClient)->Invoice:
+async def extract(batch_id: str, file_path: str, document_intelligence_client: DocumentIntelligenceClient, content_hash: str = None)->Invoice:
     """
     Extract structured data from a single invoice file.
     Returns an Invoice object with all fields, confidence scores, and status.
@@ -181,12 +183,12 @@ def extract(batch_id: str, file_path: str, document_intelligence_client: Documen
     try:
         # 1. Extract the structured data from the invoice using Azure Document Intelligence
         with open(file_path, "rb") as file:
-            poller = document_intelligence_client.begin_analyze_document(
+            poller = await document_intelligence_client.begin_analyze_document(
                 'prebuilt-invoice', body=file
             )
             
         # wait for the extraction to complete and get the results
-        analyzed_result = poller.result()
+        analyzed_result = await poller.result()
         documents = analyzed_result.documents
         
         if not documents: 
@@ -228,11 +230,32 @@ def extract(batch_id: str, file_path: str, document_intelligence_client: Documen
             # Azure returned a document but with no fields — flag for review
             status = "review"
         
+
+        if content_hash is not None and content_hash in batch.duplicate_hashes:
+            # This is a duplicate; mark as review and skip extraction.
+            print(f"[PID: {pid}] ⚠️ Duplicate file detected via content_hash: {file_path} -> {content_hash}")
+            return Invoice(
+                job_id=job_id,
+                file_name=file_name,
+                status="review",             # ← flagged for human review (not blocked)
+                content_hash=content_hash,
+                # template_name defaults to model_id if provided, or None
+                template_name=batch.model_id or None,
+                **{target: None for target in FIELD_MAP.values()}
+            )
+
+        print("\n\n[DEBUG] HERE IS THE EXTRACTED INVOICE:")
+        print(extracted_invoice)
+        print(f"[DEBUG] HERE IS THE RAW FIELDS: {raw_fields}")
+        print(f"[DEBUG] HERE IS THE MAPPED FIELDS: {mapped}")
+        print(f"[DEBUG] HERE IS THE LINE ITEMS: {line_items}")
+                
         # ← return is now OUTSIDE the if-block, so it always executes
         return Invoice(
             job_id=job_id,
             file_name=file_name,
             status=status,
+            content_hash=content_hash,
             template_name=analyzed_result.model_id,
             **mapped,
             raw_fields=raw_fields,
@@ -245,31 +268,49 @@ def extract(batch_id: str, file_path: str, document_intelligence_client: Documen
             job_id=job_id,
             file_name=file_name,
             status="failed",
+            content_hash=content_hash,
             raw_fields=raw_fields if 'raw_fields' in locals() else {},
             line_items=line_items if 'line_items' in locals() else []
         )
-        
-    
-def extract_invoices(file_paths: list[str], batch_id: str)->list[Invoice]:
-    """
-    extract invoices for a process batch. Returns a list of extracted invoices as Invoice objects.
+
+async def extract_invoices(file_paths: list[str], batch_id: str, hash_map: dict[str, str] = None)->list[Invoice]:
+    """         
+    Extract invoices for a process batch. Returns a list of extracted invoices as Invoice objects.
+    hash_map: optional dict mapping file_path → content_hash for deduplication tracking.
     """
     pid = os.getpid()
+    if hash_map is None:
+        hash_map = {}
     try:
+        load_dotenv()
+        endpoint = os.getenv("DOCUMENTINTELLIGENCE_ENDPOINT")
+        key = os.getenv("DOCUMENTINTELLIGENCE_API_KEY")
+        credential = AzureKeyCredential(key)
+        
         # 1. initialize Azure Document Intelligence client once for the batch, then reuse for all files in the batch
         print(f"[PID: {pid}] 🔄 Initializing Azure Document Intelligence Client...")
-        document_intelligence_client = init_azure_client() 
+        async with DocumentIntelligenceClient(
+            credential=credential,
+            endpoint=endpoint
+        ) as client:
+            print(f"[PID: {pid}] ✅ Azure Document Intelligence Client initialized.")
+            tasks = [extract(batch_id, file_path, client) for file_path in file_paths]
+            return await asyncio.gather(*tasks)
+       
+        # # 1. initialize Azure Document Intelligence client once for the batch, then reuse for all files in the batch
+        # print(f"[PID: {pid}] 🔄 Initializing Azure Document Intelligence Client...")
+        # # document_intelligence_client = init_azure_client() 
         
-        # 2. loop through the file paths, extract each invoice, and collect the results in a list.
-        extracted_invoices: list[Invoice] = []
-        for file_path in file_paths:
-            extracted_result = extract(batch_id, file_path, document_intelligence_client=document_intelligence_client)
-            if(extracted_result):
-                print(f"[PID: {pid}] ✔️ <--Extraction.py--> Successfully extracted invoice from file {file_path} with job id {extracted_result.job_id}")
-            else: 
-                print(f"[PID: {pid}] ⚠️ <--Extraction.py--> Extraction returned None for file {file_path}")
-            extracted_invoices.append(extracted_result)
-        return extracted_invoices
+        # # 2. loop through the file paths, extract each invoice, and collect the results in a list.
+        # extracted_invoices: list[Invoice] = []
+        # for file_path in file_paths:
+        #     extracted_result = extract(batch_id, file_path, document_intelligence_client=document_intelligence_client)
+        #     if(extracted_result):
+        #         print(f"[PID: {pid}] ✔️ <--Extraction.py--> Successfully extracted invoice from file {file_path} with job id {extracted_result.job_id}")
+        #     else: 
+        #         print(f"[PID: {pid}] ⚠️ <--Extraction.py--> Extraction returned None for file {file_path}")
+        #     extracted_invoices.append(extracted_result)
+        # return extracted_invoices
     except Exception as e:
         # TODO: we might want to handle this differently depending on the use case  
         # if the Azure client initialization fails, 
@@ -279,5 +320,5 @@ def extract_invoices(file_paths: list[str], batch_id: str)->list[Invoice]:
         
         print(f"<--Extraction.py--> Error extracting invoices for batch {batch_id}: {e}")
         raise
-    finally:    
-        document_intelligence_client.close()
+    # finally:    
+    #     document_intelligence_client.close()

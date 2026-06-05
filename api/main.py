@@ -52,8 +52,15 @@ app.add_middleware(
 async def ingest(folder: list[UploadFile] = File(...)): # TODO: define a response model here.
     try:
         # pass the uploaded HTTP files to the pipeline ingest module.
-        await pipeline_ingest.ingest(folder)
-        return BatchUploadResponse(status="pending")
+        duplicates = await pipeline_ingest.ingest(folder)
+        
+        accepted_count = len(folder) - len(duplicates)
+        return BatchUploadResponse(
+            status="pending" if accepted_count > 0 else "all_duplicates",
+            accepted_count=accepted_count,
+            duplicate_count=len(duplicates),
+            duplicates=duplicates
+        )
     except ValidationError as validationError: 
         print('Validation error occured', validationError) 
         raise HTTPException(status_code=422, detail=str(validationError))

@@ -112,6 +112,7 @@ async def insert_invoice(extracted_data: Invoice) -> str:
         "tax_details":                   json.dumps(extracted_data.tax_details or {}),
         "paid_in_four_installments":     json.dumps(extracted_data.paid_in_four_installments or []),
         "raw_fields":                    json.dumps(extracted_data.raw_fields or {}),
+        "content_hash":                  extracted_data.content_hash,
     }
     
     columns = list(fields.keys())
@@ -120,10 +121,11 @@ async def insert_invoice(extracted_data: Invoice) -> str:
     # placeholder for values in SQL query 
     placeholders = ",".join(f"${i+1}" for i in range(len(values)))
     
-    # construct the SQL query:
+    # construct the SQL query (ON CONFLICT for dedup safety net):
     sql_query = f"""
     INSERT INTO invoices ({",".join(columns)})
     VALUES ({placeholders})
+    ON CONFLICT (content_hash) WHERE content_hash IS NOT NULL DO NOTHING
     RETURNING id;
     """
     
@@ -136,9 +138,10 @@ async def insert_invoice(extracted_data: Invoice) -> str:
             async with connection.transaction():
                 invoice_id = await connection.fetchval(sql_query, *values)
                 
-                # TODO: check if this is necessary, or if asyncpg will raise an error if the insert fails and no ID is returned.
-                if(invoice_id is None):
-                    raise RuntimeError("Failed to insert invoice, no ID returned.")
+                # If invoice_id is None, the insert was skipped due to duplicate content_hash
+                if invoice_id is None:
+                    print(f"<--INSERT_INVOICE--> Duplicate detected (content_hash), skipping invoice for job {extracted_data.job_id}")
+                    return None
                 
                 
                 await insert_line_items(invoice_id, extracted_data.line_items, connection)
