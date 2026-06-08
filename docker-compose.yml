@@ -13,43 +13,43 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
-  # zookeeper:
-  #   image: confluentinc/cp-zookeeper:7.3.0
-  #   container_name: invostream-zookeeper
-  #   environment:
-  #     ZOOKEEPER_CLIENT_PORT: 2181
-  #     ZOOKEEPER_TICK_TIME: 2000
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.3.0
+    container_name: invostream-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
 
-  # kafka:
-  #   image: confluentinc/cp-kafka:7.3.0
-  #   container_name: invostream-kafka
-  #   ports:
-  #     - "9092:9092"
-  #   depends_on:
-  #     - zookeeper
-  #   environment:
-  #     KAFKA_BROKER_ID: 1
-  #     KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-  #     KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
-  #     KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
-  #     KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-  #     KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-  #     KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+  kafka:
+    image: confluentinc/cp-kafka:7.3.0
+    container_name: invostream-kafka
+    ports:
+      - "9092:9092"
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
 
-  # debezium:
-  #   image: debezium/connect:2.4
-  #   container_name: invostream-debezium
-  #   ports:
-  #     - "8083:8083"
-  #   depends_on:
-  #     - postgres
-  #     - kafka
-  #   environment:
-  #     - BOOTSTRAP_SERVERS=kafka:29092
-  #     - GROUP_ID=1
-  #     - CONFIG_STORAGE_TOPIC=my_connect_configs
-  #     - OFFSET_STORAGE_TOPIC=my_connect_offsets
-  #     - STATUS_STORAGE_TOPIC=my_connect_statuses
+  debezium:
+    image: debezium/connect:2.4
+    container_name: invostream-debezium
+    ports:
+      - "8083:8083"
+    depends_on:
+      - postgres
+      - kafka
+    environment:
+      - BOOTSTRAP_SERVERS=kafka:29092
+      - GROUP_ID=1
+      - CONFIG_STORAGE_TOPIC=my_connect_configs
+      - OFFSET_STORAGE_TOPIC=my_connect_offsets
+      - STATUS_STORAGE_TOPIC=my_connect_statuses
 
   clickhouse:
     image: clickhouse/clickhouse-server
@@ -67,6 +67,16 @@ services:
     volumes:
       - chdata:/var/lib/clickhouse
 
+  kafdrop:
+    image: obsidiandynamics/kafdrop:latest
+    container_name: invostream-kafdrop
+    ports:
+      - "9090:9000"
+    environment:
+      KAFKA_BROKERCONNECT: kafka:29092
+    depends_on:
+      - kafka
+
   grafana:
     image: grafana/grafana:latest
     container_name: invostream-grafana
@@ -80,6 +90,38 @@ services:
       - grafana_data:/var/lib/grafana
     depends_on:
       - clickhouse
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: invostream-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_HOST=postgres
+      - CLICKHOUSE_HOST=clickhouse
+      - DATABASE_URL=postgresql+psycopg2://invostream_user:13148897minhhan@postgres:5432/invostream_postgresql_db
+    depends_on:
+      - postgres
+      - kafka
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: invostream-frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - api
 
 volumes:
   pgdata:

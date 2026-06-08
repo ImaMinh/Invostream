@@ -2,7 +2,8 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, UploadFile, HTTPException, APIRouter, File, BackgroundTasks
-from fastapi.middleware.cors import CORSMiddleware  
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 # import pydantic validation error
 from pydantic import ValidationError
@@ -10,6 +11,7 @@ from pydantic import ValidationError
 # import the modules:
 from pipeline import pipeline_ingest
 from pipeline.batch import main_process
+from api import dashboard
 
 # import pydantic models
 from models.batch import BatchUploadResponse
@@ -37,7 +39,7 @@ router = APIRouter()
 
 
 # configure CORS networks #
-allowed_origins = ['http://127.0.0.1:5500']
+allowed_origins = ['http://127.0.0.1:5500', 'http://localhost:5173']
 
 # -- configure the app middle ware (traffic control layer (ASGI specification)) --- #
 app.add_middleware( 
@@ -47,14 +49,19 @@ app.add_middleware(
     allow_headers = ['*'] # clarify this later
 )
 
+# Serve raw images/pdfs for the frontend dashboard
+import os
+os.makedirs("data/raw", exist_ok=True)
+app.mount("/data/raw", StaticFiles(directory="data/raw"), name="raw_data")
+
 # === API for orchestrating files from `Upload Folder` === #
 @router.post("/invoices/batch")
 async def ingest(folder: list[UploadFile] = File(...)): # TODO: define a response model here.
     try:
         # pass the uploaded HTTP files to the pipeline ingest module.
         duplicates = await pipeline_ingest.ingest(folder)
-        
         accepted_count = len(folder) - len(duplicates)
+        
         return BatchUploadResponse(
             status="pending" if accepted_count > 0 else "all_duplicates",
             accepted_count=accepted_count,
@@ -69,3 +76,4 @@ async def ingest(folder: list[UploadFile] = File(...)): # TODO: define a respons
 
 
 app.include_router(router)
+app.include_router(dashboard.router)

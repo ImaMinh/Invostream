@@ -106,7 +106,7 @@ COMMIT;
 
 SELECT '001_initial_schema: UP completed successfully' AS status;
 
--- === DOWN ===
+-- -- === DOWN ===
 -- BEGIN;
 
 -- DROP TABLE IF EXISTS invoice_line_items CASCADE;
