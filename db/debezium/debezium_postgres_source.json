@@ -1,0 +1,27 @@
+{
+  "name": "invostream-postgres-connector",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "topic.prefix": "invostream",
+    "plugin.name": "pgoutput",
+    "tasks.max": "1",
+    "database.hostname": "postgres",
+    "database.port": "5432",
+    "database.user": "invostream_user",
+    "database.password": "13148897minhhan",
+    "database.dbname": "invostream_postgresql_db",
+    "database.server.name": "invostream_db_server",
+    "table.include.list": "public.invoices,public.invoice_line_items",
+    "slot.name": "debezium_slot_v2",
+    "publication.name": "debezium_publication_v2",
+    "publication.autocreate.mode": "filtered",
+    "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "key.converter.schemas.enable": "false",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter.schemas.enable": "false",
+    "transforms": "unwrap",
+    "transforms.unwrap.type": "io.debezium.transforms.ExtractNewRecordState",
+    "transforms.unwrap.drop.tombstones": "false",
+    "decimal.handling.mode": "double"
+  }
+}
