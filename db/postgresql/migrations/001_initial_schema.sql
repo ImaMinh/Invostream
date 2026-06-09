@@ -79,6 +79,9 @@ CREATE TABLE invoices (
     -- Per-field values + confidence, and catch-all for unmapped fields
     raw_fields JSONB,
 
+    -- Content hash for deduplication
+    content_hash CHAR(64) UNIQUE,  -- SHA-256 hash of invoice content
+
     -- Timestamps
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()

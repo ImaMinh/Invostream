@@ -107,11 +107,11 @@ async def insert_invoice(extracted_data: Invoice) -> str:
         "previous_unpaid_balance":       extracted_data.previous_unpaid_balance,
         "payment_term":                  extracted_data.payment_term,
         "kvk_number":                    extracted_data.kvk_number,
-        # JSONB fields need json.dumps
-        "payment_details":               json.dumps(extracted_data.payment_details or {}),
-        "tax_details":                   json.dumps(extracted_data.tax_details or {}),
-        "paid_in_four_installments":     json.dumps(extracted_data.paid_in_four_installments or []),
-        "raw_fields":                    json.dumps(extracted_data.raw_fields or {}),
+        # JSONB fields need json.dumps, use Pydantic's model_dump(mode='json') to safely serialize Decimals/Dates
+        "payment_details":               json.dumps(extracted_data.model_dump(mode='json').get('payment_details') or {}),
+        "tax_details":                   json.dumps(extracted_data.model_dump(mode='json').get('tax_details') or {}),
+        "paid_in_four_installments":     json.dumps(extracted_data.model_dump(mode='json').get('paid_in_four_installments') or []),
+        "raw_fields":                    json.dumps(extracted_data.model_dump(mode='json').get('raw_fields') or {}),
         "content_hash":                  extracted_data.content_hash,
     }
     

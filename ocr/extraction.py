@@ -108,9 +108,9 @@ def get_field_value(field: DocumentField):
     elif t == "boolean":
         return field.value_boolean
     elif t == "array":
-        return field.value_array         # list[DocumentField]
+        return [get_field_value(item) for item in field.value_array] if field.value_array else []
     elif t == "object":
-        return field.value_object        # dict[str, DocumentField]
+        return {k: get_field_value(v) for k, v in field.value_object.items()} if field.value_object else {}
     else:
         return field.content             # fallback for unknown types
 

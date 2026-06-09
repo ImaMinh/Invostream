@@ -125,6 +125,7 @@ async def handle_worker_result(future: asyncio.Future, batch_id: str):
                 # insert_analytics(invoice, invoice_uuid, batch_id) # Removed Dual-Write
             except Exception as e:
                 print(f"Error inserting invoice data into database for batch {batch_id}: {e}")
+                traceback.print_exc()
                 continue  # Continue processing the next invoice even if one fails
         JOB_QUEUE.task_done()
     except Exception as error:
