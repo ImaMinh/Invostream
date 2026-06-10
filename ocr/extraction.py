@@ -1,6 +1,7 @@
 # import necessary modules for environment variable management
 import os
 from dotenv import load_dotenv
+from services.telemetry.tracer import track_time, track_block
 
 # import necessary modules for Azure Document Intelligence
 from azure.core.credentials import AzureKeyCredential
@@ -16,6 +17,7 @@ from decimal import Decimal
 import asyncio
 
 from services.dedup.deduplication import compute_hash_from_path
+from services.telemetry.tracer import track_time
 
 
 # Globals
@@ -162,53 +164,56 @@ async def extract(batch_id: str, file_path: str, document_intelligence_client: D
     
     try:
         # 1. Extract the structured data from the invoice using Azure Document Intelligence
-        with open(file_path, "rb") as file:
-            poller = await document_intelligence_client.begin_analyze_document(
-                'prebuilt-invoice', body=file
-            )
+        with track_block("ocr", batch_id):
+            with open(file_path, "rb") as file:
+                poller = await document_intelligence_client.begin_analyze_document(
+                    'prebuilt-invoice', body=file
+                )
+                
+            # wait for the extraction to complete and get the results
+            analyzed_result = await poller.result()
             
-        # wait for the extraction to complete and get the results
-        analyzed_result = await poller.result()
         documents = analyzed_result.documents
         
         if not documents: 
             raise ValueError(f"<--Extraction.py--> No documents extracted from the invoice {file_path}")
         
-        extracted_invoice = documents[0]
-        raw_fields = {}
-        mapped = {}
-        line_items = []
-        
-        # 2. Loop through all the fields returned by Azure, and extract the value and confidence score for each field.
-        # Flag the invoice for review if any field has a confidence score below the threshold (e.g. 0.8). The threshold can be adjusted based on requirements.
-        if extracted_invoice.fields:
-            for field_name, field_value in extracted_invoice.fields.items():
-                raw_fields[field_name] = {
-                    "value": field_value.content,
-                    "confidence": field_value.confidence
-                }
-                
-                # Line items are handled separately since they are nested under "Items" and have their own sub-fields. We will extract them as a list of dictionaries and assign to the invoice_line_items field in the Invoice model.
-                if field_name == "Items":
-                    line_items = _extract_line_items(field_value, job_id, LINE_ITEM_FIELD_MAP)
-                    continue
-                
-                target = FIELD_MAP.get(field_name)
-                if target is None:
-                    continue # skip fields that are not in the FIELD_MAP, we only care about the mapped fields for now
-                
-                value = get_field_value(field_value)   # ← typed value, not .content
-                if value is not None:
-                    mapped[target] = value
-                else:
-                    status = "review"
+        with track_block("mapping", batch_id):
+            extracted_invoice = documents[0]
+            raw_fields = {}
+            mapped = {}
+            line_items = []
+            
+            # 2. Loop through all the fields returned by Azure, and extract the value and confidence score for each field.
+            # Flag the invoice for review if any field has a confidence score below the threshold (e.g. 0.8). The threshold can be adjusted based on requirements.
+            if extracted_invoice.fields:
+                for field_name, field_value in extracted_invoice.fields.items():
+                    raw_fields[field_name] = {
+                        "value": field_value.content,
+                        "confidence": field_value.confidence
+                    }
                     
-                confidence = field_value.confidence
-                if confidence is None or confidence < 0.8:
-                    status = "review"
-        else:
-            # Azure returned a document but with no fields — flag for review
-            status = "review"
+                    # Line items are handled separately since they are nested under "Items" and have their own sub-fields. We will extract them as a list of dictionaries and assign to the invoice_line_items field in the Invoice model.
+                    if field_name == "Items":
+                        line_items = _extract_line_items(field_value, job_id, LINE_ITEM_FIELD_MAP)
+                        continue
+                    
+                    target = FIELD_MAP.get(field_name)
+                    if target is None:
+                        continue # skip fields that are not in the FIELD_MAP, we only care about the mapped fields for now
+                    
+                    value = get_field_value(field_value)   # ← typed value, not .content
+                    if value is not None:
+                        mapped[target] = value
+                    else:
+                        status = "review"
+                        
+                    confidence = field_value.confidence
+                    if confidence is None or confidence < 0.8:
+                        status = "review"
+            else:
+                # Azure returned a document but with no fields — flag for review
+                status = "review"
                 
         return Invoice(
             job_id=job_id,

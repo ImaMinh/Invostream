@@ -4,6 +4,8 @@ import { LayoutDashboard, FileCheck, Settings, FileSearch } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import ReviewInvoices from './pages/ReviewInvoices';
 import InvoiceDetail from './pages/InvoiceDetail';
+import Upload from './pages/Upload';
+import { Upload as UploadIcon } from 'lucide-react';
 
 function App() {
   return (
@@ -33,12 +35,13 @@ function App() {
               Invoice Review
             </NavLink>
 
-            <div style={{ marginTop: 'auto' }}>
-              <div className="nav-item" style={{ cursor: 'pointer' }}>
-                <Settings size={20} />
-                Settings
-              </div>
-            </div>
+            <NavLink 
+              to="/upload" 
+              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+            >
+              <UploadIcon size={20} />
+              Upload Invoices
+            </NavLink>
           </nav>
         </aside>
 
@@ -48,6 +51,7 @@ function App() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/review" element={<ReviewInvoices />} />
             <Route path="/review/:id" element={<InvoiceDetail />} />
+            <Route path="/upload" element={<Upload />} />
           </Routes>
         </main>
       </div>

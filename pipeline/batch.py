@@ -1,6 +1,5 @@
 import os
 import uuid
-import hashlib
 from concurrent.futures import ProcessPoolExecutor
 from fastapi import UploadFile
 from fastapi import HTTPException
@@ -9,11 +8,11 @@ import asyncio
 from db.postgresql.invoices import insert_invoice
 
 from db.sqlite.job_queue import enqueue_jobs
-from db.postgresql.pool import get_db_connection
 from pipeline.runner import run_worker
 from models.invoice import Invoice
 from models.batch import DuplicateFileInfo
 from services.dedup.deduplication import compute_hash, find_existing
+from services.telemetry.tracer import track_time, track_block
 
 # global job queue
 JOB_QUEUE = asyncio.Queue() 
@@ -96,9 +95,15 @@ async def batch_setup(chunk: list[UploadFile]) -> list[DuplicateFileInfo]:
             file_paths = [fp for fp, _ in saved_results]
 
             await enqueue_jobs(batch_id=batch_id, file_paths=file_paths)
+            import time
+            
+            # Đóng gói start_time độc lập cho từng file
+            file_jobs = [{"path": fp, "start_time": time.time()} for fp in file_paths]
+            
             await JOB_QUEUE.put({
                 "batch_id": batch_id,
                 "file_paths": file_paths,
+                "file_jobs": file_jobs
             })
 
         return duplicates
@@ -107,13 +112,27 @@ async def batch_setup(chunk: list[UploadFile]) -> list[DuplicateFileInfo]:
         raise HTTPException(status_code=500, detail=str(error))
 
 # --- helper handler for worker result (DB insertion and other jobs (TODO)) ---
-async def handle_worker_result(future: asyncio.Future, batch_id: str):
+
+async def handle_worker_result(future: asyncio.Future, batch_id: str, file_start_times: dict = None):
     try:
         extraction_results = await future
+        import time
+
         for extracted_data in extraction_results:
             try: 
+                # Tính thời gian độc lập cho từng file ngay trước khi insert
+                file_name = extracted_data.get("file_name")
+                file_start = file_start_times.get(file_name) if file_start_times else None
+                
+                if file_start:
+                    extracted_data["total_processing_time_ms"] = int((time.time() - file_start) * 1000)
+                else:
+                    extracted_data["total_processing_time_ms"] = 0
+                    
                 invoice = Invoice(**extracted_data)   # dict → model
-                invoice_uuid = await insert_invoice(invoice)
+                invoice_uuid: str = None
+                with track_block("db_insert", batch_id):
+                    invoice_uuid = await insert_invoice(invoice)
                 
                 # insert_invoice returns None if a duplicate was caught at the DB level
                 if invoice_uuid is None:
@@ -149,6 +168,10 @@ async def main_process():
 
         batch_id = job["batch_id"]
         file_paths = job["file_paths"]
+        file_jobs = job.get("file_jobs", [])
+        
+        # Tạo mapping để tra cứu start_time theo file_name
+        file_start_times = {f["path"].split("/")[-1]: f["start_time"] for f in file_jobs}
         
         print(f"<-- MAIN PROCESS--> Main Process received job: {batch_id}. Dispatching to workers...")
         
@@ -172,4 +195,4 @@ async def main_process():
 
         # listing for finished worker process and trigger the callback function handle_worker_result
         # to handle the results from the worker process in the background. 
-        asyncio.create_task(handle_worker_result(future, batch_id))
+        asyncio.create_task(handle_worker_result(future, batch_id, file_start_times))

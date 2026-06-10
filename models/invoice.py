@@ -102,5 +102,8 @@ class Invoice(BaseModel):
     # timestamps
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    
+    # telemetry
+    total_processing_time_ms: int = 0
 
     line_items: list[InvoiceLineItem] = []

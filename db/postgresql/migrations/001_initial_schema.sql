@@ -82,6 +82,9 @@ CREATE TABLE invoices (
     -- Content hash for deduplication
     content_hash CHAR(64) UNIQUE,  -- SHA-256 hash of invoice content
 
+    -- telemetry
+    total_processing_time_ms Integer DEFAULT 0,
+
     -- Timestamps
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -111,10 +114,10 @@ SELECT '001_initial_schema: UP completed successfully' AS status;
 
 -- -- === DOWN ===
 -- BEGIN;
-
+-- 
 -- DROP TABLE IF EXISTS invoice_line_items CASCADE;
 -- DROP TABLE IF EXISTS invoices CASCADE;
-
+-- 
 -- SELECT '001_initial_schema: DOWN completed successfully' AS status;
-
+-- 
 -- COMMIT;

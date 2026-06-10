@@ -11,13 +11,16 @@ from pydantic import ValidationError
 # import the modules:
 from pipeline import pipeline_ingest
 from pipeline.batch import main_process
-from api import dashboard
+from api.frontend import dashboard
+from api.frontend import invoices
 
 # import pydantic models
 from models.batch import BatchUploadResponse
 
 import uuid
+import os
 import asyncio
+from services.telemetry.tracer import track_time
 
 # import database connection pool management functions
 from db.postgresql.pool import init_db_pool, close_db_pool, get_db_connection
@@ -49,13 +52,12 @@ app.add_middleware(
     allow_headers = ['*'] # clarify this later
 )
 
-# Serve raw images/pdfs for the frontend dashboard
-import os
 os.makedirs("data/raw", exist_ok=True)
 app.mount("/data/raw", StaticFiles(directory="data/raw"), name="raw_data")
 
 # === API for orchestrating files from `Upload Folder` === #
 @router.post("/invoices/batch")
+@track_time("upload")
 async def ingest(folder: list[UploadFile] = File(...)): # TODO: define a response model here.
     try:
         # pass the uploaded HTTP files to the pipeline ingest module.
@@ -77,3 +79,4 @@ async def ingest(folder: list[UploadFile] = File(...)): # TODO: define a respons
 
 app.include_router(router)
 app.include_router(dashboard.router)
+app.include_router(invoices.router)

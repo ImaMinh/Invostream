@@ -8,7 +8,7 @@ export default function ReviewInvoices() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('http://localhost:8000/api/dashboard/review-invoices')
+    fetch('http://localhost:8000/api/invoices/review-invoices')
       .then(res => res.json())
       .then(data => {
         setInvoices(data);
@@ -46,7 +46,7 @@ export default function ReviewInvoices() {
                 border: '1px solid var(--border-color)',
                 padding: '0.6rem 1rem 0.6rem 2.2rem',
                 borderRadius: '8px',
-                color: 'white',
+                color: 'black',
                 outline: 'none',
                 fontFamily: 'Outfit'
               }}

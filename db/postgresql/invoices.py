@@ -113,6 +113,7 @@ async def insert_invoice(extracted_data: Invoice) -> str:
         "paid_in_four_installments":     json.dumps(extracted_data.model_dump(mode='json').get('paid_in_four_installments') or []),
         "raw_fields":                    json.dumps(extracted_data.model_dump(mode='json').get('raw_fields') or {}),
         "content_hash":                  extracted_data.content_hash,
+        "total_processing_time_ms":      extracted_data.total_processing_time_ms,
     }
     
     columns = list(fields.keys())

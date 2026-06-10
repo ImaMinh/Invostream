@@ -4,6 +4,7 @@ from image_process.deskew_step import deskew_images
 from image_process.adaptive_thresholding import threshold
 from image_process.denoise import denoise
 import os
+from services.telemetry.tracer import track_time
 
 def process_image(image_path: str, batch_id: str):
      # 1. Extract the file extension
@@ -23,6 +24,7 @@ def process_image(image_path: str, batch_id: str):
     return path
 
 
+@track_time("preprocessing")
 def ingest_image(file_paths: list[str], batch_id: str) -> tuple[list[str], list[str]]:
     print("<INGEST IMAGE -- IMAGE PROCESS> Received batch: ", batch_id)
 

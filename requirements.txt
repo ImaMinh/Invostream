@@ -75,3 +75,4 @@ websockets==16.0
 wheel==0.46.3
 yarl==1.24.2
 zstandard==0.25.0
+aiokafka==0.14.1

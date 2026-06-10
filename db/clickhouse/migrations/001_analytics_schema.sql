@@ -132,10 +132,10 @@ ORDER BY (created_at, template_name, vendor_name, status); -- How data is sorted
 -- TABLE 2: processing_metrics (Step-Level Timing)
 -- =============================================
 CREATE TABLE IF NOT EXISTS processing_metrics (
-    -- === Identifiers ===
-    invoice_id                  UUID,
-    job_id                      String,
-    batch_id                    String,
+    -- -- === Identifiers ===
+    -- invoice_id                  UUID,
+    -- job_id                      String,
+    -- batch_id                    String,
 
     -- === Step Info ===
     -- The pipeline step name
@@ -149,14 +149,14 @@ CREATE TABLE IF NOT EXISTS processing_metrics (
     -- === Outcome ===
     success                     UInt8    DEFAULT 1, -- 0 = failed, 1 = success
     error_message               String   DEFAULT '',
-    timed_out                   UInt8    DEFAULT 0,
+    -- timed_out                   UInt8    DEFAULT 0,
 
     -- === Timestamps ===
     created_at                  DateTime DEFAULT now()
 )
 ENGINE = MergeTree()
 PARTITION BY toYYYYMM(created_at)
-ORDER BY (created_at, step_name, batch_id);
+ORDER BY (created_at, step_name);
 
 
 -- =============================================

@@ -12,18 +12,31 @@ export default function InvoiceDetail() {
 
   // Editable fields mapping
   const editableFields = [
+    { key: 'invoice_id', label: 'Invoice ID' },
+    { key: 'purchase_order', label: 'Purchase Order' },
+    { key: 'invoice_date', label: 'Invoice Date' },
+    { key: 'due_date', label: 'Due Date' },
     { key: 'vendor_name', label: 'Vendor Name' },
     { key: 'vendor_tax_id', label: 'Vendor Tax ID' },
     { key: 'vendor_address', label: 'Vendor Address' },
+    { key: 'vendor_address_recipient', label: 'Vendor Recipient' },
     { key: 'customer_name', label: 'Customer Name' },
     { key: 'customer_tax_id', label: 'Customer Tax ID' },
     { key: 'customer_address', label: 'Customer Address' },
-    { key: 'invoice_id', label: 'Invoice ID' },
-    { key: 'invoice_date', label: 'Invoice Date' },
-    { key: 'due_date', label: 'Due Date' },
+    { key: 'customer_address_recipient', label: 'Customer Recipient' },
     { key: 'subtotal', label: 'Subtotal' },
+    { key: 'total_discount', label: 'Total Discount' },
     { key: 'total_tax', label: 'Total Tax' },
     { key: 'invoice_total', label: 'Invoice Total' },
+    { key: 'amount_due', label: 'Amount Due' },
+    { key: 'previous_unpaid_balance', label: 'Previous Unpaid Balance' },
+    { key: 'country_code', label: 'Country Code' },
+    { key: 'currency', label: 'Currency' },
+    { key: 'payment_term', label: 'Payment Term' },
+    { key: 'billing_address', label: 'Billing Address' },
+    { key: 'shipping_address', label: 'Shipping Address' },
+    { key: 'remittance_address', label: 'Remittance Address' },
+    { key: 'service_address', label: 'Service Address' },
   ];
 
   // Metadata (Read-only)
@@ -36,7 +49,7 @@ export default function InvoiceDetail() {
   ];
 
   useEffect(() => {
-    fetch(`http://localhost:8000/api/dashboard/invoice/${id}`)
+    fetch(`http://localhost:8000/api/invoices/invoice/${id}`)
       .then(res => res.json())
       .then(data => {
         setInvoice(data);
@@ -137,7 +150,7 @@ export default function InvoiceDetail() {
                     border: '1px solid var(--border-color)',
                     padding: '0.8rem 1rem',
                     borderRadius: '8px',
-                    color: 'white',
+                    color: 'black',
                     outline: 'none',
                     fontFamily: 'Outfit',
                     transition: 'border-color 0.2s'

@@ -82,5 +82,23 @@ async def remove_job(job_id: str, table_name: str = 'job_queue'):
         print(f"failed to remove job {job_id}: {e}")
         raise   
     
-
-    
+async def get_queue_size(table_name: str = 'job_queue') -> int:
+    """
+    Returns the number of jobs currently in the queue with status 'pending'.
+    """
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            if db is None:
+                return 0
+            
+            # Ensure table exists first to avoid error if called before queue is initialized
+            async with db.execute(f"SELECT name from sqlite_master WHERE type='table' AND name='{table_name}'") as cursor:
+                if not await cursor.fetchone():
+                    return 0
+                    
+            async with db.execute(f"SELECT COUNT(*) FROM {table_name} WHERE status = 'pending'") as cursor:
+                result = await cursor.fetchone()
+                return result[0] if result else 0
+    except Exception as e:
+        print(f"failed to get queue size: {e}")
+        return 0    

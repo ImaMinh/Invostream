@@ -74,6 +74,8 @@ CREATE TABLE IF NOT EXISTS kafka_invoices_source (
     -- Per-field values + confidence, and catch-all for unmapped fields
     raw_fields String,
     
+    total_processing_time_ms UInt32,
+    
     -- timestamps and metadata
     created_at DateTime,
     updated_at DateTime
@@ -147,13 +149,14 @@ SELECT
     min_confidence,
     fields_extracted_count,
     low_confidence_field_count,
+    total_processing_time_ms,
     created_at,
     now() AS processed_at
 FROM kafka_invoices_source
 WHERE id IS NOT NULL;
 
 -- =====================================================================
--- Create a Materialized View to pipe data from Kafka to field_confidence =====
+-- Create a Materialized View to pipe data from Kafka to field_confidence 
 -- =====================================================================
 CREATE MATERIALIZED VIEW IF NOT EXISTS mv_kafka_to_field_confidence TO field_confidence AS
 SELECT
@@ -204,6 +207,46 @@ SELECT
     now() AS created_at
 FROM kafka_line_items_source
 WHERE invoice_id IS NOT NULL;
+
+-- =====================================================================
+-- Create a Kafka Engine Table to consume from the telemetry topic
+-- =====================================================================    
+CREATE TABLE IF NOT EXISTS kafka_telemetry_source (
+    -- invoice_id UUID,
+    -- job_id String,
+    -- batch_id String,
+    step_name String,
+    started_at DateTime64(3),
+    finished_at DateTime64(3),
+    duration_ms UInt32,
+    success UInt8,
+    error_message String,
+    -- timed_out UInt8
+)
+ENGINE = Kafka
+SETTINGS 
+    kafka_broker_list = 'kafka:29092',
+    kafka_topic_list = 'invostream.telemetry', 
+    kafka_group_name = 'clickhouse_telemetry_consumer',
+    kafka_format = 'JSONEachRow';
+
+-- ======================================================================
+-- Create a Materialized View to pipe data from Kafka to processing_metrics
+-- =====================================================================
+CREATE MATERIALIZED VIEW IF NOT EXISTS mv_kafka_to_processing_metrics TO processing_metrics AS
+SELECT
+    -- invoice_id,
+    -- job_id,
+    -- batch_id,
+    step_name,
+    started_at,
+    finished_at,
+    duration_ms,
+    success,
+    error_message,
+    -- timed_out,
+    now() AS created_at
+FROM kafka_telemetry_source;
 
 -- -- =====================
 -- -- == Down Migrations == 
