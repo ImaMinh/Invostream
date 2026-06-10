@@ -59,7 +59,17 @@ export default function InvoiceDetail() {
         console.error("Failed to fetch invoice detail", err);
         setLoading(false);
       });
-  }, [id]);
+   }, [id]);
+
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') setIsImageOpen(false);
+    };
+    if (isImageOpen) {
+      window.addEventListener('keydown', handleEsc);
+      return () => window.removeEventListener('keydown', handleEsc);
+    }
+  }, [isImageOpen]);
 
   const handleInputChange = (key, value) => {
     setInvoice(prev => ({
@@ -76,7 +86,7 @@ export default function InvoiceDetail() {
     });
 
     try {
-      const response = await fetch(`http://localhost:8000/api/dashboard/invoice/${id}`, {
+      const response = await fetch(`http://localhost:8000/api/invoices/invoice/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
@@ -97,6 +107,21 @@ export default function InvoiceDetail() {
     } finally {
       setSaving(false);
     }
+  };
+
+  // Convert snake_case → PascalCase to match raw_fields keys
+  const toPascalCase = (str) => str.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('');
+
+  const rawFields = React.useMemo(() => {
+    if (!invoice?.raw_fields) return {};
+    try {
+      return typeof invoice.raw_fields === 'string' ? JSON.parse(invoice.raw_fields) : invoice.raw_fields;
+    } catch { return {}; }
+  }, [invoice]);
+
+  const getConfidence = (snakeKey) => {
+    const entry = rawFields[toPascalCase(snakeKey)];
+    return entry?.confidence ?? null;
   };
 
   if (loading) {
@@ -140,7 +165,19 @@ export default function InvoiceDetail() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
             {editableFields.map(field => (
               <div key={field.key} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <label style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{field.label}</label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{field.label}</label>
+                  <span style={{ 
+                      fontSize: '0.72rem', 
+                      fontWeight: 600, 
+                      color: getConfidence(field.key) === null ? 'var(--text-secondary)' : getConfidence(field.key) >= 0.9 ? 'var(--success)' : getConfidence(field.key) >= 0.7 ? 'var(--warning)' : 'var(--danger)',
+                      background: 'rgba(0,0,0,0.04)', 
+                      padding: '1px 8px', 
+                      borderRadius: '10px'
+                    }}>
+                      {getConfidence(field.key) !== null ? (getConfidence(field.key) * 100).toFixed(1) : '0.0'}%
+                    </span>
+                </div>
                 <input 
                   type="text" 
                   value={invoice[field.key] || ''} 
@@ -199,7 +236,7 @@ export default function InvoiceDetail() {
                 </div>
               ) : (
                 <img 
-                  src={`http://localhost:8000/data/raw/${invoice.job_id}/${invoice.file_name}`} 
+                  src={`http://localhost:8000/data/raw/${invoice.job_id?.split('_')[0]}/${invoice.file_name}`} 
                   style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
                   alt="Thumbnail"
                 />
@@ -234,31 +271,32 @@ export default function InvoiceDetail() {
             position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
             backgroundColor: 'rgba(15, 17, 26, 0.95)', zIndex: 9999,
             display: 'flex', flexDirection: 'column',
-            backdropFilter: 'blur(8px)'
+            backdropFilter: 'blur(8px)',
+            overflow: 'hidden'
           }}
         >
-          <div style={{ padding: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)' }}>
-            <h3 style={{ color: 'white' }}>{invoice.file_name}</h3>
+          <div style={{ padding: '1rem 1.5rem', display: 'flex', justifyContent: 'center', gap: '1.5rem', alignItems: 'center', flexShrink: 0 }}>
+            <h3 style={{ color: 'white', margin: 0, fontSize: '1rem' }}>{invoice.file_name}</h3>
             <button 
               className="btn" 
               onClick={() => setIsImageOpen(false)}
-              style={{ background: 'transparent', borderColor: 'var(--text-secondary)' }}
+              style={{ background: 'transparent', borderColor: 'rgba(255,255,255,0.2)', color: 'white' }}
             >
               Close
             </button>
           </div>
-          <div style={{ flex: 1, padding: '2rem', overflow: 'auto', display: 'flex', justifyContent: 'center' }}>
+          <div style={{ flex: 1, minHeight: 0, padding: '1rem 2rem 2rem', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
             {invoice.file_name?.toLowerCase().endsWith('.pdf') ? (
               <iframe 
-                src={`http://localhost:8000/data/raw/${invoice.job_id}/${invoice.file_name}`} 
+                src={`http://localhost:8000/data/raw/${invoice.job_id?.split('_')[0]}/${invoice.file_name}`} 
                 style={{ width: '100%', height: '100%', border: 'none', borderRadius: '8px', background: 'white' }}
                 title="Invoice Document Full"
               />
             ) : (
               <img 
-                src={`http://localhost:8000/data/raw/${invoice.job_id}/${invoice.file_name}`} 
+                src={`http://localhost:8000/data/raw/${invoice.job_id?.split('_')[0]}/${invoice.file_name}`} 
                 alt="Invoice Document Full" 
-                style={{ maxWidth: '100%', objectFit: 'contain', borderRadius: '8px' }}
+                style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '8px' }}
               />
             )}
           </div>

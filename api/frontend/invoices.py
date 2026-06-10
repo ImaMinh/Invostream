@@ -15,9 +15,7 @@ async def get_review_invoices():
             query = """
             SELECT id, vendor_name, DATE(created_at) as date, invoice_total, status, raw_fields
             FROM invoices
-            WHERE status IN ('review', 'failed')
             ORDER BY created_at DESC
-            LIMIT 50
             """
             rows = await conn.fetch(query)
             

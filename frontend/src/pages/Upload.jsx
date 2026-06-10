@@ -67,12 +67,17 @@ const Upload = () => {
 
     // Simulate an upload process
     try {
-      // In a real app, you would use FormData and fetch/axios here
-      // const formData = new FormData();
-      // files.forEach(file => formData.append('folder', file));
-      // await fetch('/api/upload', { method: 'POST', body: formData });
+      const formData = new FormData();
+      files.forEach(file => formData.append('folder', file));
       
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      const response = await fetch('http://localhost:8000/invoices/batch', { 
+        method: 'POST', 
+        body: formData 
+      });
+
+      if (!response.ok) {
+        throw new Error(`Upload failed with status: ${response.status}`);
+      }
       
       setUploadedFilesHistory(prev => {
         const newHistory = new Set(prev);
