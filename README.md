@@ -6,8 +6,8 @@
 
 - **OCR Bất đồng bộ & Đa tiến trình:** Xử lý hóa đơn hàng loạt với `ProcessPoolExecutor` và `asyncio.Queue` để API calls không bị block trong suốt quá trình OCR.
 - **Chống trùng lặp thông minh (Deduplication):** Kiểm tra SHA-256 hash trước khi gọi Azure API, tiết kiệm chi phí cloud và tránh dữ liệu bị duplicate.
-- **Streaming dữ liệu thời gian thực (CDC):** Debezium bắt mọi thay đổi từ PostgreSQL WAL → đẩy event qua Kafka → ClickHouse tự động ingest — không cần dual-write.
-- **Dashboard phân tích hiệu năng cao:** ClickHouse consume từ Kafka, cung cấp metrics real-time cho dashboard: throughput, latency, accuracy, backlog.
+- **Streaming dữ liệu thời gian thực (CDC):** Debezium đọc thay đổi từ PostgreSQL WAL → đẩy event qua Kafka → ClickHouse tự động ingest.
+- **Dashboard phân tích hiệu năng cao:** ClickHouse consume từ Kafka, cung cấp thông số real-time cho dashboard: throughput, latency, accuracy, backlog.
 - **Human-in-the-loop:** Giao diện React cho phép người dùng review hóa đơn có confidence thấp, chỉnh sửa trường dữ liệu và approve.
 - **Telemetry Pipeline:** Đo lường latency từng bước xử lý (upload → preprocessing → OCR → mapping → DB insert) và export non-blocking qua Kafka.
 
@@ -49,7 +49,6 @@
 
 ```bash
 git clone https://github.com/ImaMinh/Invostream.git
-cd invostream
 ```
 
 ### Bước 2: Cấu Hình Biến Môi Trường
@@ -63,7 +62,7 @@ cp .env.example .env
 Mở file `.env` và điền thông tin Azure:
 
 ```env
-# === Azure Document Intelligence (BẮT BUỘC) ===
+# === Azure Document Intelligence (BẮT BUỘC -- cần có thông tin API key azure ở đây) ===
 DOCUMENTINTELLIGENCE_API_KEY='your_azure_api_key_here'
 DOCUMENTINTELLIGENCE_ENDPOINT='https://your-resource.cognitiveservices.azure.com/'
 
@@ -83,7 +82,7 @@ CLICKHOUSE_PASSWORD=invostream_ch_pass
 ```
 
 > [!IMPORTANT]
-> Phải có Azure Document Intelligence API Key để hệ thống OCR hoạt động. Đăng ký tại [Azure Portal](https://portal.azure.com/).
+> Phải có Azure Document Intelligence API Key để hệ thống OCR hoạt động.
 
 ### Bước 3: Khởi Chạy Toàn Bộ Hệ Thống
 
@@ -118,9 +117,9 @@ docker exec -i invostream-clickhouse clickhouse-client --multiquery < db/clickho
 docker exec -i invostream-clickhouse clickhouse-client --multiquery < db/clickhouse/migrations/002_kafka_pipeline.sql
 ```
 
-#### 4b. Đăng ký Debezium Connector
+hoặc có thể reset sử dụng script reset ở bên dưới. 
 
-Đợi khoảng 10-15 giây sau khi Debezium container ready, rồi chạy:
+#### 4b. Đăng ký Debezium Connector
 
 ```bash
 curl -i -X POST -H "Accept:application/json" -H "Content-Type:application/json" \
@@ -135,12 +134,11 @@ curl http://localhost:8083/connectors/invostream-postgres-connector/status
 ```
 
 > [!NOTE]
-> Bảng PostgreSQL (`invoices`, `invoice_line_items`) sẽ được tự động tạo bởi FastAPI khi server khởi động lần đầu. Nếu muốn reset toàn bộ, xem phần [Reset Môi Trường Dev](#reset-môi-trường-dev).
+> Bảng PostgreSQL (`invoices`, `invoice_line_items`) sẽ được tự động tạo bởi FastAPI khi server khởi động lần đầu.
 
 ### Bước 5: Truy Cập Giao Diện
 
 Mở trình duyệt và truy cập các địa chỉ sau:
-
 | Dịch vụ | URL | Mô tả |
 |---|---|---|
 | **Invostream UI** | [http://localhost:5173](http://localhost:5173) | Giao diện chính — upload, review, dashboard |
@@ -309,15 +307,3 @@ curl -X DELETE http://localhost:8083/connectors/invostream-postgres-connector
 curl -i -X POST -H "Accept:application/json" -H "Content-Type:application/json" \
   http://localhost:8083/connectors/ -d @db/debezium/debezium_postgres_source.json
 ```
-
-### Dọn dẹp Docker khi hết dung lượng
-```bash
-# Xóa tất cả image, container, volume không sử dụng
-docker system prune -a --volumes
-```
-
----
-
-## License
-
-MIT
