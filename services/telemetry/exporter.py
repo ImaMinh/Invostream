@@ -7,18 +7,25 @@ Exporter script to send metric data to Kafka topic: invostream.telemetry
 from aiokafka import AIOKafkaProducer
 import json
 import os
+import asyncio
 from datetime import datetime
 
-_producer = None
+_producers = {}
 
 async def get_kafka_producer():
-    global _producer
-    if _producer is None:
-        kafka_server = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
-        _producer = AIOKafkaProducer(bootstrap_servers=kafka_server)
-        await _producer.start()
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        return None
 
-    return _producer
+    loop_id = id(loop)
+    if loop_id not in _producers:
+        kafka_server = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:29092") # Inside docker network, should use kafka container hostname
+        producer = AIOKafkaProducer(bootstrap_servers=kafka_server)
+        await producer.start()
+        _producers[loop_id] = producer
+
+    return _producers[loop_id]
 
 async def export_metric_to_kafka(
     step_name: str, 

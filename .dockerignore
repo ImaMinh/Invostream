@@ -1,0 +1,17 @@
+.git
+.github
+.vscode
+.claude
+.agents
+**/node_modules
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.env
+data/
+db/
+venv/
+env/
+.venv/
+.env/

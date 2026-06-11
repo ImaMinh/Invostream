@@ -10,6 +10,8 @@ services:
       - POSTGRES_USER=invostream_user
       - POSTGRES_PASSWORD=13148897minhhan
       - POSTGRES_DB=invostream_postgresql_db
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=invostream_ch_pass
     volumes:
       - pgdata:/var/lib/postgresql/data
 
