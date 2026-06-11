@@ -1,13 +1,13 @@
 # Invostream
 
-**Invostream** là một hệ thống xử lý hóa đơn thời gian thực (real-time invoice processing pipeline) được xây dựng trên kiến trúc event-driven. Hệ thống tích hợp OCR thông minh (Azure Document Intelligence), pipeline streaming CDC (Change Data Capture), và giao diện "human-in-the-loop" cho phép con người duyệt và chỉnh sửa kết quả OCR trước khi chốt dữ liệu.
+**Invostream** là một hệ thống xử lý hóa đơn được xây dựng trên kiến trúc event-driven. Hệ thống tích hợp OCR (Azure Document Intelligence), pipeline streaming CDC (Change Data Capture), và giao diện "human-in-the-loop" cho phép người dùng duyệt và chỉnh sửa kết quả OCR trước khi chốt dữ liệu.
 
 ## Tính Năng Chính
 
-- **OCR Bất đồng bộ & Đa tiến trình:** Xử lý hóa đơn hàng loạt với `ProcessPoolExecutor` và `asyncio.Queue` — API không bị block trong suốt quá trình OCR.
+- **OCR Bất đồng bộ & Đa tiến trình:** Xử lý hóa đơn hàng loạt với `ProcessPoolExecutor` và `asyncio.Queue` để API calls không bị block trong suốt quá trình OCR.
 - **Chống trùng lặp thông minh (Deduplication):** Kiểm tra SHA-256 hash trước khi gọi Azure API, tiết kiệm chi phí cloud và tránh dữ liệu bị duplicate.
 - **Streaming dữ liệu thời gian thực (CDC):** Debezium bắt mọi thay đổi từ PostgreSQL WAL → đẩy event qua Kafka → ClickHouse tự động ingest — không cần dual-write.
-- **Dashboard phân tích hiệu năng cao:** ClickHouse (OLAP) native consume từ Kafka, cung cấp metrics real-time cho dashboard: throughput, latency, accuracy, backlog.
+- **Dashboard phân tích hiệu năng cao:** ClickHouse consume từ Kafka, cung cấp metrics real-time cho dashboard: throughput, latency, accuracy, backlog.
 - **Human-in-the-loop:** Giao diện React cho phép người dùng review hóa đơn có confidence thấp, chỉnh sửa trường dữ liệu và approve.
 - **Telemetry Pipeline:** Đo lường latency từng bước xử lý (upload → preprocessing → OCR → mapping → DB insert) và export non-blocking qua Kafka.
 
@@ -44,12 +44,6 @@
 ---
 
 ## Hướng Dẫn Cài Đặt & Chạy
-
-### Yêu Cầu
-
-- **Docker** & **Docker Compose** (v2+)
-- **Azure Document Intelligence** API Key & Endpoint (để sử dụng OCR)
-- **Git**
 
 ### Bước 1: Clone Project
 
@@ -89,7 +83,7 @@ CLICKHOUSE_PASSWORD=invostream_ch_pass
 ```
 
 > [!IMPORTANT]
-> Bạn **bắt buộc** phải có Azure Document Intelligence API Key để hệ thống OCR hoạt động. Đăng ký tại [Azure Portal](https://portal.azure.com/).
+> Phải có Azure Document Intelligence API Key để hệ thống OCR hoạt động. Đăng ký tại [Azure Portal](https://portal.azure.com/).
 
 ### Bước 3: Khởi Chạy Toàn Bộ Hệ Thống
 
@@ -177,7 +171,7 @@ Giao diện Invostream có 3 trang chính:
 
 ---
 
-## Reset Môi Trường Dev
+## Reset Database
 
 Sử dụng script `reset_dev.sh` để xóa toàn bộ dữ liệu và reset schema:
 
@@ -199,40 +193,6 @@ Script sẽ thực hiện:
 
 > [!WARNING]
 > Script này sẽ **XÓA TOÀN BỘ DỮ LIỆU**. Chỉ sử dụng để reset.
-
----
-
-## Kiến Trúc Hệ Thống
-
-```mermaid
-sequenceDiagram
-    participant FE as Frontend (React)
-    participant API as FastAPI
-    participant PI as pipeline_ingest
-    participant Q as JOB_QUEUE (asyncio)
-    participant WK as Worker Process
-    participant PG as PostgreSQL (OLTP)
-    participant DBZ as Debezium (CDC)
-    participant KF as Kafka
-    participant CH as ClickHouse (OLAP)
-
-    FE->>API: POST /invoices/batch (Upload files)
-    API->>PI: batch_setup(chunk)
-    Note over PI: Compute SHA-256 Hash<br/>& Dedup Check
-    PI->>Q: JOB_QUEUE.put(Job)
-    API-->>FE: BatchUploadResponse
-
-    Q->>WK: Fetch Job (via run_in_executor)
-    Note over WK: 1. Image Preprocessing<br/>(Normalize, Grayscale,<br/>Deskew, Threshold, Denoise)<br/>2. Azure AI OCR Extraction
-    WK-->>API: Extracted Invoice Data
-
-    API->>PG: insert_invoice() (Transaction)
-
-    Note over PG, CH: --- Real-Time CDC Pipeline ---
-    PG-->>DBZ: WAL (Write-Ahead Log)
-    DBZ-->>KF: Push Event to Kafka Topic
-    KF-->>CH: Materialized View Auto-Ingest
-```
 
 ---
 
@@ -295,7 +255,7 @@ invostream/
 │   │       ├── InvoiceDetail.jsx # Chi tiết & chỉnh sửa hóa đơn
 │   │       └── Upload.jsx        # Upload hóa đơn hàng loạt
 ├── scripts/
-│   └── reset_dev.sh              # Nuclear reset cho development
+│   └── reset_dev.sh              # Reset cho development
 ├── data/                         # Thư mục lưu file upload (mounted volume)
 ├── docker-compose.yml            # Orchestration 8 services
 ├── Dockerfile                    # Backend (Python 3.12-slim)
