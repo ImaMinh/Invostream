@@ -107,7 +107,13 @@ Lệnh này sẽ build và khởi chạy **8 container**:
 
 Sau khi tất cả container đã chạy, thực hiện các bước sau để khởi tạo schema:
 
-#### 4a. Tạo bảng ClickHouse (Analytics)
+#### 4a. Tạo bảng PostgreSQL (OLTP)
+
+```bash
+docker exec -i invostream-postgres psql -U invostream_user -d invostream_postgresql_db < db/postgresql/migrations/001_initial_schema.sql
+```
+
+#### 4b. Tạo bảng ClickHouse (Analytics)
 
 ```bash
 # Tạo schema OLAP (Star Schema)
@@ -119,7 +125,7 @@ docker exec -i invostream-clickhouse clickhouse-client --multiquery < db/clickho
 
 hoặc có thể reset sử dụng script reset ở bên dưới. 
 
-#### 4b. Đăng ký Debezium Connector
+#### 4c. Đăng ký Debezium Connector
 
 ```bash
 curl -i -X POST -H "Accept:application/json" -H "Content-Type:application/json" \
@@ -134,7 +140,7 @@ curl http://localhost:8083/connectors/invostream-postgres-connector/status
 ```
 
 > [!NOTE]
-> Bảng PostgreSQL (`invoices`, `invoice_line_items`) sẽ được tự động tạo bởi FastAPI khi server khởi động lần đầu.
+> FastAPI **không** tự tạo bảng PostgreSQL — nó chỉ khởi tạo connection pool (`asyncpg.create_pool`). Bạn phải chạy migration SQL ở bước 4a trước khi sử dụng hệ thống.
 
 ### Bước 5: Truy Cập Giao Diện
 

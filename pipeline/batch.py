@@ -120,19 +120,21 @@ async def handle_worker_result(future: asyncio.Future, batch_id: str, file_start
 
         for extracted_data in extraction_results:
             try: 
-                # Tính thời gian độc lập cho từng file ngay trước khi insert
-                file_name = extracted_data.get("file_name")
-                file_start = file_start_times.get(file_name) if file_start_times else None
+                # # Tính thời gian độc lập cho từng file ngay trước khi insert
+                # file_name = extracted_data.get("file_name")
+                # file_start = file_start_times.get(file_name) if file_start_times else None
                 
-                if file_start:
-                    extracted_data["total_processing_time_ms"] = int((time.time() - file_start) * 1000)
-                else:
-                    extracted_data["total_processing_time_ms"] = 0
+                # if file_start:
+                #     extracted_data["total_processing_time_ms"] = int((time.time() - file_start) * 1000)
+                # else:
+                #     extracted_data["total_processing_time_ms"] = 0
                     
                 invoice = Invoice(**extracted_data)   # dict → model
                 invoice_uuid: str = None
-                with track_block("db_insert", batch_id):
-                    invoice_uuid = await insert_invoice(invoice)
+                
+                # with track_block("db_insert", batch_id):
+                
+                invoice_uuid = await insert_invoice(invoice)
                 
                 # insert_invoice returns None if a duplicate was caught at the DB level
                 if invoice_uuid is None:
@@ -161,7 +163,8 @@ async def main_process():
     # - loop ends when all chunks are done.
 
     loop = asyncio.get_running_loop()
-    executor = ProcessPoolExecutor(max_workers=os.cpu_count())
+    # Limit max_workers to prevent Out-Of-Memory (OOM) on systems with many cores
+    executor = ProcessPoolExecutor(max_workers=min(3, os.cpu_count()))
 
     while True:
         job = await JOB_QUEUE.get()

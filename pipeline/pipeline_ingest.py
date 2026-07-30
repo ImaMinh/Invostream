@@ -1,6 +1,5 @@
-import os
 import traceback
-from fastapi import BackgroundTasks, HTTPException
+from fastapi import HTTPException
 from fastapi import UploadFile
 from pipeline.batch import batch_setup
 from models.batch import DuplicateFileInfo

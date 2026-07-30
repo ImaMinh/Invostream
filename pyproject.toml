@@ -1,0 +1,8 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "unit: pure logic, no external deps",
+    "integration: requires DB or mocked services",
+    "e2e: full pipeline flow",
+]
