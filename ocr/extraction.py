@@ -150,43 +150,56 @@ def _extract_line_items(items_field: DocumentField, invoice_job_id: str, sub_map
     
     return line_items
 
-# -- Main extraction function that takes in a file path and the Azure client, and returns an Invoice object with the extracted data --
-async def extract(batch_id: str, file_path: str, document_intelligence_client: DocumentIntelligenceClient)->Invoice:
+OCR_MAX_CONCURRENCY = int(os.getenv("OCR_MAX_CONCURRENCY", "8"))
+OCR_SEMAPHORE = asyncio.Semaphore(OCR_MAX_CONCURRENCY)
+
+
+def _read_bytes(file_path: str) -> bytes:
+    """Reads file bytes synchronously for offloading to a thread."""
+    with open(file_path, "rb") as f:
+        return f.read()
+
+
+def _failed_invoice(job_id: str, file_name: str, raw_fields: dict = None, line_items: list = None) -> Invoice:
+    return Invoice(
+        job_id=job_id,
+        file_name=file_name,
+        status="failed",
+        content_hash="",
+        raw_fields=raw_fields or {},
+        line_items=line_items or [],
+    )
+
+
+# -- Main extraction function that takes in a file path and the Azure client, and returns an Invoice object --
+async def extract(batch_id: str, file_path: str, document_intelligence_client: DocumentIntelligenceClient) -> Invoice:
     """
     Extract structured data from a single invoice file.
     Returns an Invoice object with all fields, confidence scores, and status.
     """
-        
-    # required non-null fields:
-    job_id = f"{batch_id}_{os.path.basename(file_path)}"  # unique identifier for the invoice, can be used as primary key in the database
+    job_id = f"{batch_id}_{os.path.basename(file_path)}"
     file_name = os.path.basename(file_path)
-    status = "success"  # default status is success, will be updated to "review" if any field has low confidence
+    status = "success"
     
-    try:
-        # 1. Extract the structured data from the invoice using Azure Document Intelligence
-        # with track_block("ocr", batch_id):
+    raw_fields = {}
+    mapped = {}
+    line_items = []
 
-        with open(file_path, "rb") as file:
+    try:
+        file_bytes = await asyncio.to_thread(_read_bytes, file_path)
+
+        async with OCR_SEMAPHORE:
             poller = await document_intelligence_client.begin_analyze_document(
-                'prebuilt-invoice', body=file
+                'prebuilt-invoice', body=file_bytes
             )
-            
-        # wait for the extraction to complete and get the results
-        analyzed_result = await poller.result()
+            analyzed_result = await poller.result()
             
         documents = analyzed_result.documents
-        
         if not documents: 
             raise ValueError(f"<--Extraction.py--> No documents extracted from the invoice {file_path}")
         
-        # with track_block("mapping", batch_id):
         extracted_invoice = documents[0]
-        raw_fields = {}
-        mapped = {}
-        line_items = []
         
-        # 2. Loop through all the fields returned by Azure, and extract the value and confidence score for each field.
-        # Flag the invoice for review if any field has a confidence score below the threshold (e.g. 0.8). The threshold can be adjusted based on requirements.
         if extracted_invoice.fields:
             for field_name, field_value in extracted_invoice.fields.items():
                 raw_fields[field_name] = {
@@ -194,16 +207,15 @@ async def extract(batch_id: str, file_path: str, document_intelligence_client: D
                     "confidence": field_value.confidence
                 }
                 
-                # Line items are handled separately since they are nested under "Items" and have their own sub-fields. We will extract them as a list of dictionaries and assign to the invoice_line_items field in the Invoice model.
                 if field_name == "Items":
                     line_items = _extract_line_items(field_value, job_id, LINE_ITEM_FIELD_MAP)
                     continue
                 
                 target = FIELD_MAP.get(field_name)
                 if target is None:
-                    continue # skip fields that are not in the FIELD_MAP, we only care about the mapped fields for now
+                    continue
                 
-                value = get_field_value(field_value)   # ← typed value, not .content
+                value = get_field_value(field_value)
                 if value is not None:
                     mapped[target] = value
                 else:
@@ -213,7 +225,6 @@ async def extract(batch_id: str, file_path: str, document_intelligence_client: D
                 if confidence is None or confidence < 0.8:
                     status = "review"
         else:
-            # Azure returned a document but with no fields — flag for review
             status = "review"
                 
         return Invoice(
@@ -227,37 +238,56 @@ async def extract(batch_id: str, file_path: str, document_intelligence_client: D
             line_items=line_items
         )
     except Exception as e: 
-        # catch the error and return a failed Invoice object signaling a failed extraction, so that the pipeline can continue processing other files in the batch
         print(f"<--Extraction.py--> Error extracting invoice from file {file_path}: {e}")
-        return Invoice(
+        return _failed_invoice(job_id, file_name, raw_fields, line_items)
+
+
+async def extract_with_timeout(
+    batch_id: str,
+    file_path: str,
+    document_intelligence_client: DocumentIntelligenceClient,
+    timeout_seconds: float = 60.0,
+) -> Invoice:
+    """Wraps extract() with a 60-second timeout. Marks status='failed' if timed out."""
+    job_id = f"{batch_id}_{os.path.basename(file_path)}"
+    file_name = os.path.basename(file_path)
+
+    try:
+        return await asyncio.wait_for(
+            extract(batch_id, file_path, document_intelligence_client),
+            timeout=timeout_seconds,
+        )
+    except asyncio.TimeoutError:
+        print(f"[TIMEOUT FAILED] {file_name} exceeded processing timeout ({timeout_seconds}s).")
+        return _failed_invoice(
             job_id=job_id,
             file_name=file_name,
-            status="failed",
-            content_hash=compute_hash_from_path(file_path),
-            raw_fields=raw_fields if 'raw_fields' in locals() else {},
-            line_items=line_items if 'line_items' in locals() else []
+            raw_fields={"error": "too long to process"},
+            line_items=[],
         )
 
-async def extract_invoices(file_paths: list[str], batch_id: str)->list[Invoice]:
+
+async def extract_invoices(file_paths: list[str], batch_id: str) -> list[Invoice]:
     """         
     Extract invoices for a process batch. Returns a list of extracted invoices as Invoice objects.
     """
-    pid = os.getpid()
-    try:
-        load_dotenv()
-        endpoint = os.getenv("DOCUMENTINTELLIGENCE_ENDPOINT")
-        key = os.getenv("DOCUMENTINTELLIGENCE_API_KEY")
-        credential = AzureKeyCredential(key)
-        
-        # 1. initialize Azure Document Intelligence client once for the batch, then reuse for all files in the batch
-        print(f"[PID: {pid}] 🔄 Initializing Azure Document Intelligence Client...")
-        async with DocumentIntelligenceClient(
-            credential=credential,
-            endpoint=endpoint
-        ) as client:
-            print(f"[PID: {pid}] ✅ Azure Document Intelligence Client initialized.")
-            tasks = [extract(batch_id, file_path, client) for file_path in file_paths]
-            return await asyncio.gather(*tasks)
-    except Exception as e:
-        print(f"<--Extraction.py--> Error extracting invoices for batch {batch_id}: {e}")
-        raise
+    load_dotenv()
+    endpoint = os.getenv("DOCUMENTINTELLIGENCE_ENDPOINT")
+    key = os.getenv("DOCUMENTINTELLIGENCE_API_KEY")
+    credential = AzureKeyCredential(key)
+
+    async with DocumentIntelligenceClient(
+        credential=credential,
+        endpoint=endpoint
+    ) as client:
+        tasks = [extract_with_timeout(batch_id, file_path, client, timeout_seconds=60.0) for file_path in file_paths]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    invoices: list[Invoice] = []
+    for file_path, result in zip(file_paths, results):
+        if isinstance(result, BaseException):
+            print(f"<--Extraction.py--> {file_path} threw unexpected error: {result!r}")
+            continue
+        invoices.append(result)
+
+    return invoices

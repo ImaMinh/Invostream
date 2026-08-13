@@ -9,8 +9,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
 # import the modules:
-from pipeline import pipeline_ingest
-from pipeline.batch import main_process
+from pipeline import ingest
+from pipeline.orchestrator import main_process
 from api.frontend import dashboard
 from api.frontend import invoices
 
@@ -60,11 +60,10 @@ app.mount("/data/raw", StaticFiles(directory="data/raw"), name="raw_data")
 
 # === API for orchestrating files from `Upload Folder` === #
 @router.post("/invoices/batch")
-# @track_time("upload")
 async def ingest(folder: list[UploadFile] = File(...)): # TODO: define a response model here.
     try:
         # pass the uploaded HTTP files to the pipeline ingest module.
-        await pipeline_ingest.ingest(folder)
+        await ingest.ingest(folder)
         
         return BatchUploadResponse(
             status="pending"

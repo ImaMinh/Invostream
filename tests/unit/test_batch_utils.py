@@ -5,41 +5,38 @@ Tests save_files_to_disk() from pipeline/batch.py.
 import os
 import pytest
 
-from pipeline.batch import save_files_to_disk
+from pipeline.orchestrator import save_raw_batch
 
 
 class TestSaveFilesToDisk:
     """Tests for save_files_to_disk(uploaded_files, batch_id)."""
 
-    def test_saves_files_correctly(self, tmp_workspace, sample_file_bytes, monkeypatch):
+    @pytest.mark.asyncio
+    async def test_saves_files_correctly(self, tmp_workspace, sample_file_bytes, monkeypatch):
         """Files should be written to data/raw/{batch_id}/ with correct content."""
+        from unittest.mock import AsyncMock, MagicMock
         batch_id = "test-batch-001"
 
-        # Redirect save_files_to_disk to write into tmp_workspace instead of cwd
         monkeypatch.chdir(tmp_workspace)
 
-        uploaded_files = [
-            ("invoice1.png", sample_file_bytes, "hash1"),
-            ("invoice2.pdf", b"pdf content here", "hash2"),
-        ]
+        file1 = MagicMock()
+        file1.filename = "invoice1.png"
+        file1.read = AsyncMock(return_value=sample_file_bytes)
 
-        results = save_files_to_disk(uploaded_files, batch_id)
+        file2 = MagicMock()
+        file2.filename = "invoice2.pdf"
+        file2.read = AsyncMock(return_value=b"pdf content here")
 
-        # Verify correct number of results
-        assert len(results) == 2
+        saved_paths = await save_raw_batch([file1, file2], batch_id)
 
-        # Verify files exist and have correct content
-        path1, hash1 = results[0]
-        assert os.path.exists(path1)
-        with open(path1, "rb") as f:
+        assert len(saved_paths) == 2
+        assert os.path.exists(saved_paths[0])
+        with open(saved_paths[0], "rb") as f:
             assert f.read() == sample_file_bytes
-        assert hash1 == "hash1"
 
-        path2, hash2 = results[1]
-        assert os.path.exists(path2)
-        with open(path2, "rb") as f:
+        assert os.path.exists(saved_paths[1])
+        with open(saved_paths[1], "rb") as f:
             assert f.read() == b"pdf content here"
-        assert hash2 == "hash2"
 
     def test_strips_path_prefix_from_filename(self, tmp_workspace):
         """Filenames like 'subdir/invoice.png' should be stripped to 'invoice.png'."""

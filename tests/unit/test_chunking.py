@@ -5,7 +5,7 @@ Tests chunk_files() from pipeline/pipeline_ingest.py.
 import pytest
 from unittest.mock import MagicMock
 
-from pipeline.pipeline_ingest import chunk_files
+from pipeline.ingest import chunk_files
 
 
 def _make_mock_uploads(count: int) -> list:
