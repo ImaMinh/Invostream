@@ -6,14 +6,25 @@ from db.clickhouse.client import get_clickhouse_client
 from datetime import datetime, timedelta
 import math
 
+from fastapi.responses import StreamingResponse
+from services.telemetry.progress import progress_tracker
+
 router = APIRouter(prefix="/api/invoices", tags=["invoice"])
+
+@router.get("/batch/{batch_id}/progress")
+async def stream_batch_progress(batch_id: str):
+    """Streams real-time batch processing progress via Server-Sent Events (SSE)."""
+    return StreamingResponse(
+        progress_tracker.subscribe(batch_id),
+        media_type="text/event-stream"
+    )
 
 @router.get("/review-invoices")
 async def get_review_invoices():
     try:
         async with get_db_connection() as conn:
             query = """
-            SELECT id, vendor_name, DATE(created_at) as date, invoice_total, status, raw_fields
+            SELECT id, vendor_name, DATE(created_at) as date, invoice_total, status, reason, raw_fields
             FROM invoices
             ORDER BY created_at DESC
             """
@@ -28,6 +39,7 @@ async def get_review_invoices():
                     "date": row["date"].strftime("%Y-%m-%d") if row["date"] else "N/A",
                     "total": f"${float(row['invoice_total']):,.2f}" if row['invoice_total'] is not None else "----",
                     "status": row["status"],
+                    "reason": row["reason"] or "",
                     "confidence": "Review" # Will improve this later if raw_fields holds exact confidence
                 })
             

@@ -9,6 +9,8 @@ from models.invoice import Invoice
 from models.batch import DuplicateFileInfo
 from services.dedup.deduplication import compute_hash, find_existing
 
+from ocr.extraction_main import extract_invoices
+
 # --- Pipeline Queue Configurations ---
 NUM_PRODUCERS = int(os.getenv("NUM_PRODUCERS", "3"))
 NUM_CONSUMERS = int(os.getenv("NUM_CONSUMERS", "3"))
@@ -22,6 +24,8 @@ INGEST_TO_PRODUCER: asyncio.Queue = asyncio.Queue(maxsize=RAW_QUEUE_MAXSIZE)
 # Queue 2: Producers -> Consumers (Holds deduplicated/novel batch file paths for OCR & DB)
 PRODUCER_CONSUMER_BUFFER: asyncio.Queue = asyncio.Queue(maxsize=DEDUPED_QUEUE_MAXSIZE)
 
+
+from services.telemetry.progress import progress_tracker
 
 # -------------- STAGE 0: SAVE RAW FILES TO DISK & ENQUEUE TO QUEUE 1 -------------- #
 async def save_raw_batch(chunk: list[UploadFile], batch_id: str) -> list[str]:
@@ -44,6 +48,9 @@ async def save_raw_batch(chunk: list[UploadFile], batch_id: str) -> list[str]:
             with open(file_path, "wb") as f:
                 f.write(raw_bytes)
             saved_file_paths.append(file_path)
+
+        # Register batch in progress tracker for SSE streaming
+        progress_tracker.register_batch(batch_id, total_files=len(saved_file_paths))
 
         # Push raw job payload (folder + 20 files + batch UUID) to Queue 1
         await INGEST_TO_PRODUCER.put({
@@ -128,9 +135,6 @@ async def producer_worker(producer_id: int):
             INGEST_TO_PRODUCER.task_done()
 
 
-from ocr.extraction import extract_invoices
-
-
 # -------------- STAGE 2: CONSUMER WORKERS (OCR EXTRACTION & DB PERSISTENCE) -------------- #
 async def consumer_worker(consumer_id: int):
     """
@@ -149,24 +153,25 @@ async def consumer_worker(consumer_id: int):
 
             print(f"<CONSUMER-{consumer_id}> Processing OCR & DB insertion for batch {batch_id} ({len(novel_file_paths)} files)...")
 
-            # Execute OCR extraction concurrently via Azure Document Intelligence
+            # Execute OCR extraction and immediate DB insertion concurrently via Azure DI
             extraction_results = await extract_invoices(novel_file_paths, batch_id)
 
-            # Insert extracted results into PostgreSQL
-            saved_count = 0
-            for invoice in extraction_results:
-                try:
-                    invoice_uuid = await insert_invoice(invoice)
+            # # Insert extracted results into PostgreSQL
+            # saved_count = 0
+            # for invoice in extraction_results:
+            #     try:
+            #         invoice_uuid = await insert_invoice(invoice)
 
-                    if invoice_uuid is None:
-                        continue
-                    saved_count += 1
-                    print(f"<CONSUMER-{consumer_id}> Inserted invoice '{invoice.file_name}' -> UUID: {invoice_uuid}")
-                except Exception as e:
-                    print(f"<CONSUMER-{consumer_id}> Error inserting invoice record for batch {batch_id}: {e}")
-                    traceback.print_exc()
+            #         if invoice_uuid is None:
+            #             continue
+            #         saved_count += 1
+            #         print(f"<CONSUMER-{consumer_id}> Inserted invoice '{invoice.file_name}' -> UUID: {invoice_uuid}")
+            #     except Exception as e:
+            #         print(f"<CONSUMER-{consumer_id}> Error inserting invoice record for batch {batch_id}: {e}")
+            #         traceback.print_exc()
 
-            print(f"<CONSUMER-{consumer_id}> Successfully processed batch {batch_id} ({saved_count}/{len(extraction_results)} inserted).")
+            # print(f"<CONSUMER-{consumer_id}> Successfully processed batch {batch_id} ({saved_count}/{len(extraction_results)} inserted).")
+            print(f"<CONSUMER-{consumer_id}> Successfully processed batch {batch_id} ({len(extraction_results)} inserted).")
 
         except asyncio.CancelledError:
             break

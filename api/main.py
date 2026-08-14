@@ -60,7 +60,7 @@ app.mount("/data/raw", StaticFiles(directory="data/raw"), name="raw_data")
 
 # === API for orchestrating files from `Upload Folder` === #
 @router.post("/invoices/batch")
-async def ingest(folder: list[UploadFile] = File(...)): # TODO: define a response model here.
+async def upload_batch(folder: list[UploadFile] = File(...)): # TODO: define a response model here.
     try:
         # pass the uploaded HTTP files to the pipeline ingest module.
         await ingest.ingest(folder)
@@ -72,6 +72,7 @@ async def ingest(folder: list[UploadFile] = File(...)): # TODO: define a respons
         print('Validation error occured', validationError) 
         raise HTTPException(status_code=422, detail=str(validationError))
     except Exception as error:
+        print(f"Upload batch error: {error}")
         raise HTTPException(status_code=500, detail=str(error))
 
 

@@ -45,6 +45,7 @@ export default function InvoiceDetail() {
     { key: 'job_id', label: 'Job ID' },
     { key: 'file_name', label: 'Original File' },
     { key: 'status', label: 'Current Status' },
+    { key: 'reason', label: 'Processing Reason' },
     { key: 'created_at', label: 'Ingested At' }
   ];
 
@@ -251,7 +252,19 @@ export default function InvoiceDetail() {
               <div key={field.key} style={{ paddingBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.2rem' }}>{field.label}</div>
                 <div style={{ fontSize: '0.95rem', wordBreak: 'break-all' }}>
-                  {field.key === 'status' ? (
+                  {field.key === 'reason' ? (
+                    invoice.reason ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.2rem' }}>
+                        {invoice.reason.split(';').map((r, idx) => (
+                          <div key={idx} style={{ color: invoice.status === 'failed' ? 'var(--danger)' : 'var(--warning)', fontSize: '0.85rem' }}>
+                            • {r.trim()}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>None</span>
+                    )
+                  ) : field.key === 'status' ? (
                     <span className={`status-badge status-${invoice[field.key]}`}>{invoice[field.key]}</span>
                   ) : (
                     invoice[field.key] || 'N/A'

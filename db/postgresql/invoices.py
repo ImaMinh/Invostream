@@ -73,6 +73,7 @@ async def insert_invoice(extracted_data: Invoice) -> str:
         "job_id":                        extracted_data.job_id,
         "file_name":                     extracted_data.file_name,
         "status":                        extracted_data.status,
+        "reason":                        extracted_data.reason,
         "template_name":                 extracted_data.template_name,
         "country_code":                  extracted_data.country_code,
         "currency":                      extracted_data.currency,
@@ -146,7 +147,7 @@ async def insert_invoice(extracted_data: Invoice) -> str:
                 
                 
                 await insert_line_items(invoice_id, extracted_data.line_items, connection)
-                print(f"<--INSERT_INVOICE--> Successfully inserted invoice with ID: {invoice_id} for job {extracted_data.job_id}")
+                # print(f"<--INSERT_INVOICE--> Successfully inserted invoice with ID: {invoice_id} for job {extracted_data.job_id}")
                 return str(invoice_id)
     except Exception as e:
         print(f"<--INSERT_INVOICE--> Error inserting invoice for job {extracted_data.job_id}: {e}")

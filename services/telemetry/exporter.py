@@ -66,4 +66,5 @@ async def export_metric_to_kafka(
         await producer.send_and_wait("invostream.telemetry", json.dumps(payload).encode('utf-8'))
         
     except Exception as e:
-        print(f"Failed to send telemetry to Kafka: {e}")
+        # Telemetry is optional when running without Kafka
+        pass
