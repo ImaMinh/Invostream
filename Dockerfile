@@ -2,6 +2,9 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+# Set Python path to project root so top-level imports (db, pipeline, models) work seamlessly
+ENV PYTHONPATH=/app
+
 # Install system dependencies for OpenCV and other packages
 RUN apt-get update && apt-get install -y \
     libgl1 \
