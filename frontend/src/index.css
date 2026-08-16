@@ -480,7 +480,8 @@ body {
   --text-subtext: #d1d5db;
   --mesh-stroke: rgba(255, 255, 255, 0.4);
   --mesh-dot: rgba(255, 255, 255, 0.8);
-  --circular-track-stroke: #27272a;
+  --circular-track-stroke: #3f3f46;
+  --circular-track-border: rgba(255, 255, 255, 0.18);
   --bento-outer-bg: #0a0a0b;
   --bento-inner-bg: #070709;
   --bento-inner-border: rgba(255, 255, 255, 0.35);
@@ -489,7 +490,7 @@ body {
   --bento-texture-opacity: 0.07;
   --dropzone-bg: rgba(12, 12, 14, 0.8);
   --dropzone-border: rgba(75, 85, 99, 0.5);
-  --dropzone-texture-opacity: 0.03;
+  --dropzone-texture-opacity: 0.04;
   --upload-icon-color: rgba(255, 255, 255, 0.9);
   --upload-icon-hover: #ffffff;
   --upload-subtext-color: #a3a3a3;
@@ -504,9 +505,14 @@ body {
   --alert-error-text: #f43f5e;
   --alert-warning-text: #f59e0b;
   --summary-timer-color: rgba(255, 255, 255, 0.8);
-  --card-processing-footer: #fbbf24;
-  --card-completed-footer: #34d399;
-  --card-review-footer: #fbbf24;
+  /* Solid Black & White Ring Token - Dark Mode */
+  --ring-stroke-color: #ffffff;
+  --card-processing-footer: #e4e4e7;
+  --card-completed-footer: #e4e4e7;
+  --card-success-footer: #e4e4e7;
+  --card-review-footer: #e4e4e7;
+  --card-failed-footer: #e4e4e7;
+  --pulse-completed-dot: #ffffff;
 }
 
 .theme-light {
@@ -517,6 +523,7 @@ body {
   --mesh-stroke: rgba(30, 41, 59, 0.3);
   --mesh-dot: rgba(30, 41, 59, 0.65);
   --circular-track-stroke: #cbd5e1;
+  --circular-track-border: rgba(15, 23, 42, 0.18);
   --bento-outer-bg: rgba(203, 213, 225, 0.4);
   --bento-inner-bg: #f8fafc;
   --bento-inner-border: #94a3b8;
@@ -540,7 +547,33 @@ body {
   --alert-error-text: #be123c;
   --alert-warning-text: #b45309;
   --summary-timer-color: #334155;
-  --card-processing-footer: #d97706;
-  --card-completed-footer: #059669;
-  --card-review-footer: #b45309;
+  /* Solid Black & White Ring Token - Light Mode */
+  --ring-stroke-color: #09090b;
+  --card-processing-footer: #0f172a;
+  --card-completed-footer: #0f172a;
+  --card-success-footer: #0f172a;
+  --card-review-footer: #0f172a;
+  --card-failed-footer: #0f172a;
+  --pulse-completed-dot: #09090b;
+}
+
+/* Lenis Heavy Friction Scroll Rules */
+html.lenis, html.lenis body {
+  height: auto;
+}
+
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+.lenis.lenis-smooth iframe {
+  pointer-events: none;
 }
