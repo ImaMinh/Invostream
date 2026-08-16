@@ -3,6 +3,7 @@ from typing import Dict, AsyncGenerator
 from pydantic import BaseModel, Field
 from datetime import datetime
 
+
 class BatchProgress(BaseModel):
     batch_id: str
     total_files: int
@@ -14,11 +15,13 @@ class BatchProgress(BaseModel):
     status: str = "processing"  # "processing", "completed", "failed"
     updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
 
+
 class BatchProgressTracker:
     """
     In-memory singleton tracker that handles real-time batch progress
     updates and streams Server-Sent Events (SSE) to active client listeners.
     """
+
     def __init__(self):
         self._batches: Dict[str, BatchProgress] = {}
         self._listeners: Dict[str, list[asyncio.Queue]] = {}
@@ -42,7 +45,9 @@ class BatchProgressTracker:
         else:
             progress.failed_files += 1
 
-        progress.progress_percent = round((progress.processed_files / max(1, progress.total_files)) * 100, 1)
+        progress.progress_percent = round(
+            (progress.processed_files / max(1, progress.total_files)) * 100, 1
+        )
         if progress.processed_files >= progress.total_files:
             progress.status = "completed"
 
@@ -67,7 +72,9 @@ class BatchProgressTracker:
             while True:
                 # Wait for next progress event with a timeout safety net
                 try:
-                    progress: BatchProgress = await asyncio.wait_for(queue.get(), timeout=30.0)
+                    progress: BatchProgress = await asyncio.wait_for(
+                        queue.get(), timeout=30.0
+                    )
                     yield f"data: {progress.model_dump_json()}\n\n"
                     if progress.status == "completed":
                         break
@@ -77,6 +84,7 @@ class BatchProgressTracker:
         finally:
             if batch_id in self._listeners and queue in self._listeners[batch_id]:
                 self._listeners[batch_id].remove(queue)
+
 
 # Global tracker instance
 progress_tracker = BatchProgressTracker()

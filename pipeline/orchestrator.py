@@ -27,6 +27,7 @@ PRODUCER_CONSUMER_BUFFER: asyncio.Queue = asyncio.Queue(maxsize=DEDUPED_QUEUE_MA
 
 from services.telemetry.progress import progress_tracker
 
+
 # -------------- STAGE 0: SAVE RAW FILES TO DISK & ENQUEUE TO QUEUE 1 -------------- #
 async def save_raw_batch(chunk: list[UploadFile], batch_id: str) -> list[str]:
     """
@@ -43,7 +44,7 @@ async def save_raw_batch(chunk: list[UploadFile], batch_id: str) -> list[str]:
                 continue
             clean_name = os.path.basename(file.filename)
             file_path = os.path.join(save_dir, clean_name)
-            
+
             raw_bytes = await file.read()
             with open(file_path, "wb") as f:
                 f.write(raw_bytes)
@@ -53,13 +54,17 @@ async def save_raw_batch(chunk: list[UploadFile], batch_id: str) -> list[str]:
         progress_tracker.register_batch(batch_id, total_files=len(saved_file_paths))
 
         # Push raw job payload (folder + 20 files + batch UUID) to Queue 1
-        await INGEST_TO_PRODUCER.put({
-            "batch_id": batch_id,
-            "folder_path": save_dir,
-            "file_paths": saved_file_paths,
-        })
+        await INGEST_TO_PRODUCER.put(
+            {
+                "batch_id": batch_id,
+                "folder_path": save_dir,
+                "file_paths": saved_file_paths,
+            }
+        )
 
-        print(f"<API INGESTION> Saved folder of {len(saved_file_paths)} files for batch {batch_id} -> Pushed to INGEST_TO_PRODUCER.")
+        print(
+            f"<API INGESTION> Saved folder of {len(saved_file_paths)} files for batch {batch_id} -> Pushed to INGEST_TO_PRODUCER."
+        )
         return saved_file_paths
 
     except Exception as error:
@@ -84,7 +89,9 @@ async def producer_worker(producer_id: int):
             batch_id = job["batch_id"]
             file_paths = job["file_paths"]
 
-            print(f"<PRODUCER-{producer_id}> Picked up batch {batch_id} ({len(file_paths)} files). Computing hashes & checking duplicates...")
+            print(
+                f"<PRODUCER-{producer_id}> Picked up batch {batch_id} ({len(file_paths)} files). Computing hashes & checking duplicates..."
+            )
 
             # 1. Read file bytes & compute content hashes
             file_data: list[tuple[str, bytes, str]] = []
@@ -108,8 +115,14 @@ async def producer_worker(producer_id: int):
             for path, _, content_hash in file_data:
                 file_name = os.path.basename(path)
                 if content_hash in existing_hashes or content_hash in seen_in_batch:
-                    duplicates.append(DuplicateFileInfo(file_name=file_name, content_hash=content_hash))
-                    print(f"<PRODUCER-{producer_id}> Skipped duplicate file: {file_name} (hash: {content_hash[:12]}...)")
+                    duplicates.append(
+                        DuplicateFileInfo(
+                            file_name=file_name, content_hash=content_hash
+                        )
+                    )
+                    print(
+                        f"<PRODUCER-{producer_id}> Skipped duplicate file: {file_name} (hash: {content_hash[:12]}...)"
+                    )
                 else:
                     novel_file_paths.append(path)
                     seen_in_batch.add(content_hash)
@@ -117,14 +130,20 @@ async def producer_worker(producer_id: int):
             # 4. Append to Queue 2 for consumers to poll
             if novel_file_paths:
                 # await enqueue_jobs(batch_id=batch_id, file_paths=novel_file_paths)
-                
-                await PRODUCER_CONSUMER_BUFFER.put({
-                    "batch_id": batch_id,
-                    "novel_file_paths": novel_file_paths,
-                })
-                print(f"<PRODUCER-{producer_id}> Enqueued batch {batch_id} with {len(novel_file_paths)} novel files to PRODUCER_CONSUMER_BUFFER.")
+
+                await PRODUCER_CONSUMER_BUFFER.put(
+                    {
+                        "batch_id": batch_id,
+                        "novel_file_paths": novel_file_paths,
+                    }
+                )
+                print(
+                    f"<PRODUCER-{producer_id}> Enqueued batch {batch_id} with {len(novel_file_paths)} novel files to PRODUCER_CONSUMER_BUFFER."
+                )
             else:
-                print(f"<PRODUCER-{producer_id}> Batch {batch_id} contains only duplicates. Skipping Consumer queue.")
+                print(
+                    f"<PRODUCER-{producer_id}> Batch {batch_id} contains only duplicates. Skipping Consumer queue."
+                )
 
         except asyncio.CancelledError:
             break
@@ -151,7 +170,9 @@ async def consumer_worker(consumer_id: int):
             batch_id = job["batch_id"]
             novel_file_paths = job["novel_file_paths"]
 
-            print(f"<CONSUMER-{consumer_id}> Processing OCR & DB insertion for batch {batch_id} ({len(novel_file_paths)} files)...")
+            print(
+                f"<CONSUMER-{consumer_id}> Processing OCR & DB insertion for batch {batch_id} ({len(novel_file_paths)} files)..."
+            )
 
             # Execute OCR extraction and immediate DB insertion concurrently via Azure DI
             extraction_results = await extract_invoices(novel_file_paths, batch_id)
@@ -171,7 +192,9 @@ async def consumer_worker(consumer_id: int):
             #         traceback.print_exc()
 
             # print(f"<CONSUMER-{consumer_id}> Successfully processed batch {batch_id} ({saved_count}/{len(extraction_results)} inserted).")
-            print(f"<CONSUMER-{consumer_id}> Successfully processed batch {batch_id} ({len(extraction_results)} inserted).")
+            print(
+                f"<CONSUMER-{consumer_id}> Successfully processed batch {batch_id} ({len(extraction_results)} inserted)."
+            )
 
         except asyncio.CancelledError:
             break
@@ -192,7 +215,9 @@ async def main_process():
     # max_cpus = min(3, os.cpu_count() or 1)
     # executor = ProcessPoolExecutor(max_workers=max_cpus)
 
-    print(f"<MAIN PROCESS> Starting {NUM_PRODUCERS} Producers and {NUM_CONSUMERS} Consumers...")
+    print(
+        f"<MAIN PROCESS> Starting {NUM_PRODUCERS} Producers and {NUM_CONSUMERS} Consumers..."
+    )
 
     producers = [
         asyncio.create_task(producer_worker(i), name=f"producer_{i}")
@@ -205,7 +230,3 @@ async def main_process():
     ]
 
     await asyncio.gather(*producers, *consumers)
-
-
-
-

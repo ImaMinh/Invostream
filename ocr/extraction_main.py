@@ -12,18 +12,18 @@ from db.postgresql.invoices import insert_invoice
 from services.telemetry.progress import progress_tracker
 
 
-
 # GLOBALS
 NUM_WORKERS = 3
 RESULTS: list = []
+
 
 async def extraction_worker(
     queue: asyncio.Queue,
     batch_id: str,
     client: DocumentIntelligenceClient,
     worker_id: int,
-    batch_results: list
-): 
+    batch_results: list,
+):
     """
     Main worker script that polls files from the buffer queue and processes extraction.
     """
@@ -32,48 +32,54 @@ async def extraction_worker(
 
         if file_path is None:
             now = datetime.now().strftime("%H:%M:%S.%f")[:-3]
-            print(f"[{now}] [Worker {worker_id}] Received shutdown signal. Exiting worker...")
+            print(
+                f"[{now}] [Worker {worker_id}] Received shutdown signal. Exiting worker..."
+            )
             queue.task_done()
             break
 
         file_name = os.path.basename(file_path)
         start_ts = datetime.now()
-        print(f"[{start_ts.strftime('%H:%M:%S.%f')[:-3]}] [Worker {worker_id}] ▶ START extraction: {file_name}")
+        print(
+            f"[{start_ts.strftime('%H:%M:%S.%f')[:-3]}] [Worker {worker_id}] ▶ START extraction: {file_name}"
+        )
 
         try:
-            res = await extract_with_timeout(batch_id, file_path, client, timeout_seconds=60.0)
+            res = await extract_with_timeout(
+                batch_id, file_path, client, timeout_seconds=60.0
+            )
             done_ts = datetime.now()
             duration = (done_ts - start_ts).total_seconds()
-            print(f"[{done_ts.strftime('%H:%M:%S.%f')[:-3]}] [Worker {worker_id}] ✔ DONE extraction: {file_name} ({duration:.2f}s)")
-        
-            if res and not isinstance(res, BaseException): 
+            print(
+                f"[{done_ts.strftime('%H:%M:%S.%f')[:-3]}] [Worker {worker_id}] ✔ DONE extraction: {file_name} ({duration:.2f}s)"
+            )
+
+            if res and not isinstance(res, BaseException):
                 invoice_id = await insert_invoice(res)
                 if invoice_id:
-                    print(f"[{done_ts.strftime('%H:%M:%S.%f')[:-3]}] [Worker {worker_id}] ✔ SUCCESSFUL insertion: {file_name} -> UUID: {invoice_id}")
+                    print(
+                        f"[{done_ts.strftime('%H:%M:%S.%f')[:-3]}] [Worker {worker_id}] ✔ SUCCESSFUL insertion: {file_name} -> UUID: {invoice_id}"
+                    )
                     batch_results.append(res)
-                    await progress_tracker.update_file_status(batch_id, file_name, success=True)
-                else:
-                    await progress_tracker.update_file_status(batch_id, file_name, success=False)
-            else:
-                await progress_tracker.update_file_status(batch_id, file_name, success=False)
+
         except Exception as e:
             print(f"<custom_extraction.py> {file_path} error: {e!r}")
             batch_results.append(e)
-            await progress_tracker.update_file_status(batch_id, file_name, success=False)
         finally:
             queue.task_done()
+
 
 # ==============================
 # ======= MAIN FUNCTION ========
 # ==============================
 async def extract_invoices(file_paths: list[str], batch_id: str) -> list[Invoice]:
-    """         
+    """
     Extract invoices for a process batch using a bounded queue of size 20.
     Returns a list of extracted invoices as Invoice objects.
     """
     batch_results: list = []
 
-    # -- API authentication -- 
+    # -- API authentication --
     endpoint = os.getenv("DOCUMENTINTELLIGENCE_ENDPOINT")
     key = os.getenv("DOCUMENTINTELLIGENCE_API_KEY")
     credential = AzureKeyCredential(key)
@@ -83,13 +89,13 @@ async def extract_invoices(file_paths: list[str], batch_id: str) -> list[Invoice
 
     # -- API Client and initiate workers --
     async with DocumentIntelligenceClient(
-        credential=credential,
-        endpoint=endpoint
+        credential=credential, endpoint=endpoint
     ) as client:
-
-        # -- Initialize worker tasks -- 
+        # -- Initialize worker tasks --
         workers = [
-            asyncio.create_task(extraction_worker(queue, batch_id, client, i, batch_results))
+            asyncio.create_task(
+                extraction_worker(queue, batch_id, client, i, batch_results)
+            )
             for i in range(NUM_WORKERS)
         ]
 

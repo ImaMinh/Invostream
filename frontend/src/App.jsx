@@ -1,52 +1,20 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
-import { LayoutDashboard, FileCheck, Settings, FileSearch } from 'lucide-react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import Navbar from './components/Navbar';
 import Dashboard from './pages/Dashboard';
 import ReviewInvoices from './pages/ReviewInvoices';
 import InvoiceDetail from './pages/InvoiceDetail';
 import Upload from './pages/Upload';
-import { Upload as UploadIcon } from 'lucide-react';
 
 function App() {
   return (
     <BrowserRouter>
-      <div className="app-container">
-        {/* Sidebar Navigation */}
-        <aside className="sidebar">
-          <div className="logo">
-            <LayoutDashboard size={28} color="#00cec9" />
-            Invostream
-          </div>
-          
-          <nav className="nav-links">
-            <NavLink 
-              to="/" 
-              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-            >
-              <LayoutDashboard size={20} />
-              Analytics
-            </NavLink>
-            
-            <NavLink 
-              to="/review" 
-              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-            >
-              <FileCheck size={20} />
-              Invoice Review
-            </NavLink>
-
-            <NavLink 
-              to="/upload" 
-              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-            >
-              <UploadIcon size={20} />
-              Upload Invoices
-            </NavLink>
-          </nav>
-        </aside>
+      <div className="min-h-screen bg-[#0a0a0b] text-white flex flex-col font-sans" style={{ minHeight: '100vh', backgroundColor: '#0a0a0b', color: '#ffffff' }}>
+        {/* Modern Responsive Top Navigation Bar */}
+        <Navbar />
 
         {/* Main Content Area */}
-        <main className="main-content">
+        <main className="flex-1 w-full" style={{ flex: 1, width: '100%' }}>
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/review" element={<ReviewInvoices />} />
