@@ -12,34 +12,18 @@ def safe_float(val, default=0.0):
         return default
     return val
 
+from db.postgresql.telemetry import (
+    get_pg_overview_metrics,
+    get_pg_accuracy_metrics,
+    get_pg_processing_metrics
+)
+
 # A router with prefix = /api/dashboard, every API below will follow this link.
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
 # ===== API for general metrics =====
 @router.get("/overview")
 async def get_dashboard_metrics():
-    """
-    ======================================================================
-    Tổng quan về các loại metrics cần có: 
-        - DASHBOARD TỔNG QUAN OCR: 
-            • Tổng số hóa đơn xử lý theo ngày / tuần / tháng (đang được triển khai)
-            • Tỷ lệ OCR thành công (%) (tính average confidence)
-            • Tỷ lệ phải can thiệp thủ công (%) (cái này tính tay sau đó bắn vào clickhouse)
-            • Thời gian phản hồi trung bình, P95, P99
-            • Số mẫu hóa đơn đang active (chỉ có một mẫu prebuilt-invoice của Azure)
-            • Số mẫu mới đang training / testing (tính năng này đang chưa được triển khai)
-        - DASHBOARD CAN THIỆP THỦ CÔNG: 
-            • Số hóa đơn cần chỉnh tay (đang được phát triển)
-            • Thời gian xử lý trung bình / hóa đơn (đã có trong processing metrics)
-            • Trường dữ liệu bị sửa nhiều nhất  (đang được phát triển)
-            • So sánh trước và sau khi retrain model. (tính năng chưa được triển khai)
-            - REPORT ĐỊNH KỲ: 
-                • Report hiệu quả OCR theo tháng 
-                • Report chất lượng dữ liệu (field hay zsai) 
-                • Report mẫu hóa đơn mới 
-                • Report hiệu năng & SLA hệ thống
-    ======================================================================
-    """
     try:
         client = get_clickhouse_client()
         
@@ -107,7 +91,6 @@ async def get_dashboard_metrics():
             print("latency = ", latency)
 
         # 5. Số mẫu hóa đơn đang active
-        # TODO: tạo feature lưu các mẫu hóa đơn đang có vào trong dim_templates
         template_query = """
             SELECT COUNT() 
             FROM dim_templates 
@@ -167,23 +150,12 @@ async def get_dashboard_metrics():
             }
         }
     except Exception as e:
-        print(f"Error fetching overview metrics: {e}")
-        raise HTTPException(status_code=500, detail="Internal Server Error")
-    
+        print(f"[ClickHouse Paused/Offline] Querying PostgreSQL Telemetry: {e}")
+        return await get_pg_overview_metrics()
 
 # ===== API for accuracy metrics  ===== 
 @router.get("/accuracy")
 async def get_accuracy_level():
-    """
-    ======================================================================
-    Tổng quan Dashboard chất lượng OCR: 
-    - DASHBOARD CHẤT LƯỢNG OCR: 
-        • Accuracy theo từng trường (ngày, tổng tiền, VAT, MST, tên NCC…) 
-        • Accuracy theo từng hóa đơn (document-level) 
-        • Tỷ lệ lỗi: sai ký tự, sai định dạng, thiếu trường, nhầm trường 
-        • Accuracy theo thời gian
-    ======================================================================
-    """
     try:
         client = get_clickhouse_client()
 
@@ -237,27 +209,16 @@ async def get_accuracy_level():
             "accuracy_over_time": accuracy_over_time
         }
     except Exception as e:
-        print(f"Error fetching accuracy metrics: {e}")
-        raise HTTPException(status_code=500, detail="Internal Server Error")
+        print(f"[ClickHouse Paused/Offline] Querying PostgreSQL Telemetry Accuracy: {e}")
+        return await get_pg_accuracy_metrics()
 
 # ===== API for performance metrics  ===== 
 @router.get("/processing_metrics")
 async def get_processing_metrics():
-    """
-    ========================================================================================
-    Tổng quan dashboard hiệu năng hệ thống:
-    - DASHBOARD HIỆU NĂNG HỆ THỐNG: 
-        • Thời gian xử lý từng bước (upload, preprocessing, OCR, postprocess, mapping) 
-        • Throughput (invoice/phút) 
-        • Queue / backlog 
-        • Timeout rate 
-        • Biểu đồ latency theo thời gian
-    ========================================================================================
-    """
     try:
         client = get_clickhouse_client()
         
-        # 1. Thời gian xử lý trung bình từng bước (upload, preprocessing, OCR, postprocess, db_insert)
+        # 1. Thời gian xử lý trung bình từng bước
         step_times_query = """
             SELECT step_name, ROUND(avg(duration_ms), 2) as avg_duration_ms
             FROM processing_metrics
@@ -266,7 +227,7 @@ async def get_processing_metrics():
         step_times_result = client.query(step_times_query)
         step_times = {row[0]: row[1] for row in step_times_result.result_rows}
         
-        # 2. Throughput (invoice/phút) trong 1 giờ qua dựa trên số lượng db_insert thành công
+        # 2. Throughput
         throughput_query = """
         SELECT COUNT() / 60 
         FROM processing_metrics 
@@ -275,7 +236,7 @@ async def get_processing_metrics():
         throughput_result = client.query(throughput_query)
         throughput = round(throughput_result.result_rows[0][0], 2) if throughput_result.result_rows else 0.0
         
-        # 3. Queue / backlog (Chênh lệch giữa số lượng upload và db_insert)
+        # 3. Queue / backlog
         backlog_query = """
             SELECT 
                 (SUM(CASE WHEN step_name = 'upload' THEN 1 ELSE 0 END) - 
@@ -284,7 +245,7 @@ async def get_processing_metrics():
         """
         backlog_result = client.query(backlog_query)
         backlog = int(backlog_result.result_rows[0][0]) if backlog_result.result_rows else 0
-        backlog = max(0, backlog) # Đảm bảo không âm
+        backlog = max(0, backlog)
         
         # 4. Timeout rate / Error rate
         timeout_query = """
@@ -316,7 +277,7 @@ async def get_processing_metrics():
             "latency_chart": latency_chart
         }
     except Exception as e:
-        print(f"Error fetching processing metrics: {e}")
-        raise HTTPException(status_code=500, detail="Internal Server Error")
+        print(f"[ClickHouse Paused/Offline] Querying PostgreSQL Telemetry Performance: {e}")
+        return await get_pg_processing_metrics()
 
 

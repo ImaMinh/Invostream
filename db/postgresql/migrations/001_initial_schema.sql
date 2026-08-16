@@ -16,6 +16,7 @@ CREATE TABLE invoices (
     file_name VARCHAR(255) NOT NULL,
     -- status of the invoice processing: 'success', 'review', 'failed'.
     status VARCHAR(50) NOT NULL CHECK (status IN ('success', 'review', 'failed')), 
+    reason TEXT, 
     template_name VARCHAR(255),
 
     -- Geographical and financial information

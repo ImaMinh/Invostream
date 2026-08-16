@@ -24,7 +24,7 @@ def process_image(image_path: str, batch_id: str):
     return path
 
 
-@track_time("preprocessing")
+# @track_time("preprocessing")
 def ingest_image(file_paths: list[str], batch_id: str) -> tuple[list[str], list[str]]:
     print("<INGEST IMAGE -- IMAGE PROCESS> Received batch: ", batch_id)
 
@@ -37,5 +37,5 @@ def ingest_image(file_paths: list[str], batch_id: str) -> tuple[list[str], list[
             failures.append(image_path)
 
     return results, failures
-    
+      
     

@@ -1,5 +1,6 @@
 {
     "python-envs.defaultEnvManager": "ms-python.python:conda",
     "python-envs.defaultPackageManager": "ms-python.python:conda",
-    "workbench.colorTheme": "Tokyo Night Light"
+    "python.defaultInterpreterPath": "/home/minh-han/miniconda3/envs/invostream/bin/python",
+    "workbench.colorTheme": "Default Dark Modern"
 }

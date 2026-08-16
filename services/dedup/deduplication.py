@@ -19,8 +19,6 @@ async def find_existing(hashes: list[str]) -> set[str]:
     if not hashes:
         return set()
     async with get_db_connection() as conn:
-        # O(1) query for finding the hashes. $1::text[] broadcasts the hashes into a
-        # Postgres text array for efficient lookup.
         rows = await conn.fetch(
             "SELECT content_hash FROM invoices WHERE content_hash = ANY($1::text[])",
             hashes

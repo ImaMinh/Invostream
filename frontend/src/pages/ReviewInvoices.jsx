@@ -69,8 +69,8 @@ export default function ReviewInvoices() {
               <th>Vendor</th>
               <th>Date</th>
               <th>Total Amount</th>
-              <th>Confidence</th>
               <th>Status</th>
+              <th>Reason</th>
               <th>Action</th>
             </tr>
           </thead>
@@ -82,14 +82,20 @@ export default function ReviewInvoices() {
                 <td>{inv.date}</td>
                 <td>{inv.total}</td>
                 <td>
-                  <span style={{ color: 'var(--warning)' }}>
-                    {inv.confidence}
-                  </span>
-                </td>
-                <td>
                   <span className={`status-badge status-${inv.status}`}>
                     {inv.status}
                   </span>
+                </td>
+                <td>
+                  {inv.reason ? (
+                    <div style={{ fontSize: '0.8rem', color: inv.status === 'failed' ? 'var(--danger)' : 'var(--warning)', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                      {inv.reason.split(';').map((r, idx) => (
+                        <div key={idx}>• {r.trim()}</div>
+                      ))}
+                    </div>
+                  ) : (
+                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>—</span>
+                  )}
                 </td>
                 <td>
                   <button className="action-btn" title="Review & Edit" onClick={(e) => { e.stopPropagation(); navigate(`/review/${inv.id}`); }}>

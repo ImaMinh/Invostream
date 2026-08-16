@@ -9,8 +9,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
 # import the modules:
-from pipeline import pipeline_ingest
-from pipeline.batch import main_process
+from pipeline import ingest
+from pipeline.orchestrator import main_process
 from api.frontend import dashboard
 from api.frontend import invoices
 
@@ -31,10 +31,13 @@ async def lifespan(app: FastAPI):
     """
     Lifespan function to manage the database connection pool.
     """
-    await init_db_pool()    # runs once when the app starts
-    asyncio.create_task(main_process()) # initialize the infinite listener loop in the background
-    yield                   # app runs here, handling requests
-    await close_db_pool()   # runs once when the app shuts down
+    # -- runs before the main listener loop --
+    await init_db_pool() # init db pool connection
+    asyncio.create_task(main_process()) # create background task for the main listener loop in main process
+    # -- returns control to the app and pauses the startup routine-- 
+    yield                   
+    # -- runs after the server shuts down (sigkill, sigint, ...) -- 
+    await close_db_pool()   
 
 # --- initiate the application ---
 app = FastAPI(lifespan=lifespan)
@@ -57,23 +60,19 @@ app.mount("/data/raw", StaticFiles(directory="data/raw"), name="raw_data")
 
 # === API for orchestrating files from `Upload Folder` === #
 @router.post("/invoices/batch")
-@track_time("upload")
-async def ingest(folder: list[UploadFile] = File(...)): # TODO: define a response model here.
+async def upload_batch(folder: list[UploadFile] = File(...)): # TODO: define a response model here.
     try:
         # pass the uploaded HTTP files to the pipeline ingest module.
-        duplicates = await pipeline_ingest.ingest(folder)
-        accepted_count = len(folder) - len(duplicates)
+        await ingest.ingest(folder)
         
         return BatchUploadResponse(
-            status="pending" if accepted_count > 0 else "all_duplicates",
-            accepted_count=accepted_count,
-            duplicate_count=len(duplicates),
-            duplicates=duplicates
+            status="pending"
         )
     except ValidationError as validationError: 
         print('Validation error occured', validationError) 
         raise HTTPException(status_code=422, detail=str(validationError))
     except Exception as error:
+        print(f"Upload batch error: {error}")
         raise HTTPException(status_code=500, detail=str(error))
 
 
