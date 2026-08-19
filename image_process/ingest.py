@@ -4,7 +4,7 @@ from image_process.deskew_step import deskew_images
 from image_process.adaptive_thresholding import threshold
 from image_process.denoise import denoise
 import os
-from services.telemetry.tracer import track_time
+from services.telemetry.legacy.tracer import track_time
 
 def process_image(image_path: str, batch_id: str):
      # 1. Extract the file extension

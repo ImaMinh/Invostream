@@ -9,6 +9,4 @@ class DuplicateFileInfo(BaseModel):
 
 class BatchUploadResponse(BaseModel):
     status: str
-    accepted_count: int = 0
-    duplicate_count: int = 0
-    duplicates: list[DuplicateFileInfo] = []
+    upload_id: str

@@ -1,11 +1,12 @@
-import asyncio, os
+import asyncio, os, time
 from decimal import Decimal
-from azure.core.exceptions import HttpResponseError
+
 from azure.ai.documentintelligence.aio import DocumentIntelligenceClient
 from azure.ai.documentintelligence.models import DocumentField
+from azure.core.exceptions import HttpResponseError
+
 from models.invoice import Invoice, InvoiceLineItem
 from services.dedup.deduplication import compute_hash_from_path
-
 
 # -- GLOBALS (FIELD MAPS) --
 # main fields map
@@ -156,8 +157,9 @@ def _read_bytes(file_path: str) -> bytes:
 
 
 def _failed_invoice(
-    job_id: str, file_name: str, reason: str = "Extraction failed", raw_fields: dict = None, line_items: list = None
+    job_id: str, file_name: str, reason: str = "Extraction failed", raw_fields: dict = None, line_items: list = None, total_processing_time_ms: int = 0
 ) -> Invoice:
+    # TODO: Compute/retain file content_hash instead of empty string for deduplication resilience
     return Invoice(
         job_id=job_id,
         file_name=file_name,
@@ -166,6 +168,7 @@ def _failed_invoice(
         content_hash="",
         raw_fields=raw_fields or {},
         line_items=line_items or [],
+        total_processing_time_ms=total_processing_time_ms,
     )
 
 
@@ -179,6 +182,7 @@ async def extract(
     Extract structured data from a single invoice file.
     Returns an Invoice object with all fields, confidence scores, status, and status reason.
     """
+    
     job_id = f"{batch_id}_{os.path.basename(file_path)}"
     file_name = os.path.basename(file_path)
     status = "success"
@@ -186,6 +190,9 @@ async def extract(
     raw_fields = {}
     mapped = {}
     line_items = []
+
+    # start-time for processing time measure
+    start_time = time.time()
 
     try:
         file_bytes = await asyncio.to_thread(_read_bytes, file_path)
@@ -241,6 +248,9 @@ async def extract(
 
         reason_str = "; ".join(review_reasons) if status == "review" else ""
 
+        # -- get the total processing time -- 
+        elapsed_process_time_ms = int((time.time() - start_time) * 1000)
+
         return Invoice(
             job_id=job_id,
             file_name=file_name,
@@ -251,18 +261,21 @@ async def extract(
             **mapped,
             raw_fields=raw_fields,
             line_items=line_items,
+            total_processing_time_ms=elapsed_process_time_ms,
         )
     except HttpResponseError as e: 
+        elapsed_process_time_ms = int((time.time() - start_time) * 1000)
         if e.status_code == 429:
             reason = "Azure API rate limit was exceeded"
         else: 
             reason = f"Azure API error (HTTP {e.status_code}): {e.message}"
-        return _failed_invoice(job_id, file_name, reason=reason)
+        return _failed_invoice(job_id, file_name, reason=reason, total_processing_time_ms=elapsed_process_time_ms)
     except Exception as e:
+        elapsed_process_time_ms = int((time.time() - start_time) * 1000)
         print(
             f"<!Extraction Error> Error extracting invoice from file {file_path}: {e}"
         )
-        return _failed_invoice(job_id, file_name, reason=f"Extraction failed: {str(e)}", raw_fields=raw_fields, line_items=line_items)
+        return _failed_invoice(job_id, file_name, reason=f"Extraction failed: {str(e)}", raw_fields=raw_fields, line_items=line_items, total_processing_time_ms=elapsed_process_time_ms)
 
 
 async def extract_with_timeout(

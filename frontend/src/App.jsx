@@ -1,25 +1,74 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import Lenis from 'lenis';
-import Navbar from './components/Navbar';
-import Dashboard from './pages/Dashboard';
+import 'lenis/dist/lenis.css';
+
+// Context & Auth
+import { UploadProvider } from './context/UploadContext';
+import { ThemeProvider } from './context/ThemeContext';
+import ProtectedRoute from './components/routes/ProtectedRoute.jsx';
+
+// Layout & Components
+import Navbar from './components/ui/Navbar.jsx';
+
+// Page Components
+import LandingPage from './pages/LandingPage';
+import Register from './pages/Register';
+import Login from './pages/Login';
+import Upload from './pages/Upload';
 import ReviewInvoices from './pages/ReviewInvoices';
 import InvoiceDetail from './pages/InvoiceDetail';
-import Upload from './pages/Upload';
+import Analytics from './pages/Analytics';
 
-import { UploadProvider } from './context/UploadContext';
+/**
+ * AppRoutes: Main routing engine and layout manager
+ */
+function AppRoutes() {
+  const location = useLocation();
+  const hideNavbar = ['/', '/landing'].includes(location.pathname) || location.pathname.startsWith('/register') || location.pathname.startsWith('/login');
 
-function App() {
+  return (
+    <div className="min-h-screen bg-[#0a0a0b] text-white flex flex-col font-sans">
+      {/* Top Navigation Bar - Hidden on Landing & Auth Pages */}
+      {!hideNavbar && <Navbar />}
+
+      {/* Main Content Area */}
+      <main className="flex-1 w-full">
+        <Routes>
+          {/* Public Unprotected Routes */}
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/landing" element={<LandingPage />} />
+          <Route path="/register/*" element={<Register />} />
+          <Route path="/login/*" element={<Login />} />
+
+          {/* Protected Authenticated Routes */}
+          <Route path="/review" element={<ProtectedRoute><ReviewInvoices /></ProtectedRoute>} />
+          <Route path="/review/:id" element={<ProtectedRoute><InvoiceDetail /></ProtectedRoute>} />
+          <Route path="/upload" element={<ProtectedRoute><Upload /></ProtectedRoute>} />
+          <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
+        </Routes>
+      </main>
+    </div>
+  );
+}
+
+/**
+ * Root Application Component
+ */
+export default function App() {
+  // Initialize Lenis smooth scroll
   useEffect(() => {
-    // Initialize Lenis smooth scroll with heavy friction & momentum decay
     const lenis = new Lenis({
-      duration: 1.0,          // High duration = heavy weighted momentum
-      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)), // Heavy friction curve
+      duration: 1.0,
+      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
       orientation: 'vertical',
       gestureOrientation: 'vertical',
       smoothWheel: true,
-      wheelMultiplier: 0.9,   // High resistance (slows down wheel velocity)
-      touchMultiplier: 1.2,
+      syncTouch: true,
+      syncTouchLerp: 0.075,
+      touchInertiaExponent: 1.7,
+      wheelMultiplier: 0.9,
+      touchMultiplier: 1.5,
       infinite: false,
     });
 
@@ -29,32 +78,16 @@ function App() {
     }
 
     requestAnimationFrame(raf);
-
-    return () => {
-      lenis.destroy();
-    };
+    return () => lenis.destroy();
   }, []);
 
   return (
-    <UploadProvider>
-      <BrowserRouter>
-        <div className="min-h-screen bg-[#0a0a0b] text-white flex flex-col font-sans" style={{ minHeight: '100vh', backgroundColor: '#0a0a0b', color: '#ffffff' }}>
-          {/* Modern Responsive Top Navigation Bar */}
-          <Navbar />
-
-          {/* Main Content Area */}
-          <main className="flex-1 w-full" style={{ flex: 1, width: '100%' }}>
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/review" element={<ReviewInvoices />} />
-              <Route path="/review/:id" element={<InvoiceDetail />} />
-              <Route path="/upload" element={<Upload />} />
-            </Routes>
-          </main>
-        </div>
-      </BrowserRouter>
-    </UploadProvider>
+    <ThemeProvider>
+      <UploadProvider>
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
+      </UploadProvider>
+    </ThemeProvider>
   );
 }
-
-export default App;

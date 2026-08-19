@@ -577,3 +577,222 @@ html.lenis, html.lenis body {
 .lenis.lenis-smooth iframe {
   pointer-events: none;
 }
+
+/* =========================================================
+   Review Invoices Enhancements: Filters, Grouping, Pagination
+   ========================================================= */
+
+.filter-bar-container {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 1.25rem;
+  backdrop-filter: blur(12px);
+  margin-bottom: 1.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.filter-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.search-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-input-wrapper input {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-color);
+  padding: 0.65rem 2.2rem 0.65rem 2.5rem;
+  border-radius: 10px;
+  color: var(--text-primary);
+  outline: none;
+  font-family: inherit;
+  font-size: 0.9rem;
+  width: 280px;
+  transition: all 0.2s ease;
+}
+
+.search-input-wrapper input:focus {
+  border-color: #6c5ce7;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.15);
+}
+
+.filter-select-input {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-color);
+  padding: 0.65rem 1rem;
+  border-radius: 10px;
+  color: var(--text-primary);
+  outline: none;
+  font-family: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.filter-select-input:hover, .filter-select-input:focus {
+  border-color: #6c5ce7;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.filter-select-input option {
+  background: #181920;
+  color: #ffffff;
+}
+
+.view-toggle-btn {
+  padding: 0.55rem 0.9rem;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: all 0.2s ease;
+}
+
+.view-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+
+.view-toggle-btn.active {
+  background: rgba(108, 92, 231, 0.15);
+  color: #6c5ce7;
+  border-color: rgba(108, 92, 231, 0.4);
+  font-weight: 600;
+}
+
+.month-group-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  backdrop-filter: blur(12px);
+  margin-bottom: 1.5rem;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+  transition: border-color 0.2s ease;
+}
+
+.month-group-card:hover {
+  border-color: rgba(108, 92, 231, 0.3);
+}
+
+.month-group-header {
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid var(--border-color);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s ease;
+}
+
+.month-group-header:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.date-upload-section {
+  border-bottom: 1px solid var(--border-color);
+}
+
+.date-upload-section:last-child {
+  border-bottom: none;
+}
+
+.date-upload-header {
+  padding: 0.875rem 1.5rem;
+  background: rgba(0, 0, 0, 0.12);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+}
+
+.date-upload-header:hover {
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.pagination-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  backdrop-filter: blur(12px);
+  margin-top: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.page-btn {
+  min-width: 36px;
+  height: 36px;
+  padding: 0 0.6rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.page-btn:hover:not(:disabled) {
+  border-color: #6c5ce7;
+  background: rgba(108, 92, 231, 0.1);
+  color: #6c5ce7;
+}
+
+.page-btn.active {
+  background: #6c5ce7;
+  color: #ffffff;
+  border-color: #6c5ce7;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(108, 92, 231, 0.3);
+}
+
+.page-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.status-chip {
+  padding: 0.25rem 0.65rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+

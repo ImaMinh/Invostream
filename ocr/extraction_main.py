@@ -9,7 +9,7 @@ from azure.ai.documentintelligence.models import DocumentField
 from models.invoice import Invoice
 from ocr.extraction_modules import extract_with_timeout
 from db.postgresql.invoices import insert_invoice
-from services.telemetry.progress import progress_tracker
+from services.telemetry.progress import upload_progress_tracker
 
 
 # GLOBALS
@@ -20,6 +20,8 @@ RESULTS: list = []
 async def extraction_worker(
     queue: asyncio.Queue,
     batch_id: str,
+    upload_id: str,
+    user_id: str | None,
     client: DocumentIntelligenceClient,
     worker_id: int,
     batch_results: list,
@@ -55,16 +57,33 @@ async def extraction_worker(
             )
 
             if res and not isinstance(res, BaseException):
+                res.user_id = user_id
                 invoice_id = await insert_invoice(res)
                 if invoice_id:
                     print(
                         f"[{done_ts.strftime('%H:%M:%S.%f')[:-3]}] [Worker {worker_id}] ✔ SUCCESSFUL insertion: {file_name} -> UUID: {invoice_id}"
                     )
                     batch_results.append(res)
+                    if upload_id:
+                        # Status: "review" (flagged for manual review due to low confidence) vs "success" (extracted & persisted)
+                        outcome = "review" if getattr(res, "status", "") == "review" else "success"
+                        await upload_progress_tracker.update_file_status(upload_id, file_name, outcome)
+                else:
+                    # Status: "failed" due to database insertion failure
+                    if upload_id:
+                        await upload_progress_tracker.update_file_status(upload_id, file_name, "failed")
+            else:
+                # Status: "failed" due to OCR extraction timeout or API exception
+                if upload_id:
+                    await upload_progress_tracker.update_file_status(upload_id, file_name, "failed")
 
         except Exception as e:
             print(f"<custom_extraction.py> {file_path} error: {e!r}")
             batch_results.append(e)
+            
+            # Status: "failed" due to unhandled system/worker exception
+            if upload_id:
+                await upload_progress_tracker.update_file_status(upload_id, file_name, "failed")
         finally:
             queue.task_done()
 
@@ -72,7 +91,7 @@ async def extraction_worker(
 # ==============================
 # ======= MAIN FUNCTION ========
 # ==============================
-async def extract_invoices(file_paths: list[str], batch_id: str) -> list[Invoice]:
+async def extract_invoices(file_paths: list[str], batch_id: str, upload_id: str = "", user_id: str | None = None) -> list[Invoice]:
     """
     Extract invoices for a process batch using a bounded queue of size 20.
     Returns a list of extracted invoices as Invoice objects.
@@ -94,7 +113,7 @@ async def extract_invoices(file_paths: list[str], batch_id: str) -> list[Invoice
         # -- Initialize worker tasks --
         workers = [
             asyncio.create_task(
-                extraction_worker(queue, batch_id, client, i, batch_results)
+                extraction_worker(queue, batch_id, upload_id, user_id, client, i, batch_results)
             )
             for i in range(NUM_WORKERS)
         ]

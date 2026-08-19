@@ -32,10 +32,13 @@ export function UploadProvider({ children }) {
   useEffect(() => {
     if (!activeUploadId) return;
 
+    // Open persistent SSE stream connection to backend StreamingResponse endpoint
     const sse = new EventSource(`http://localhost:8000/api/invoices/upload/${activeUploadId}/progress`);
 
+    // Handle real-time progress updates pushed from the backend
     sse.onmessage = (event) => {
-      try {
+      try { 
+        // Parse incoming SSE JSON payload and sync with React metrics state
         const data = JSON.parse(event.data);
         setMetrics({
           total_files: data.total_files,
@@ -48,6 +51,7 @@ export function UploadProvider({ children }) {
           status: data.status
         });
 
+        // Close stream once batch processing is complete
         if (data.status === 'completed') {
           sse.close();
         }

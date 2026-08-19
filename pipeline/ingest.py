@@ -10,7 +10,7 @@ def chunk_files(uploaded_files: list[UploadFile], chunk_size: int = 20):
         yield uploaded_files[i:i + chunk_size]
 
 # Ingestion endpoint for files received from the API layer.
-async def ingest(uploaded_files: list[UploadFile]) -> list[str]:
+async def ingest(uploaded_files: list[UploadFile], upload_id: str = "", user_id: str | None = None) -> list[str]:
     """
     Process uploaded files through the pipeline.
     Chunks files into batches of 20, assigns a batch UUID to each batch,
@@ -20,7 +20,7 @@ async def ingest(uploaded_files: list[UploadFile]) -> list[str]:
     try:
         for chunk in chunk_files(uploaded_files, 20):
             batch_id = str(uuid.uuid4())
-            await save_raw_batch(chunk, batch_id)
+            await save_raw_batch(chunk, batch_id=batch_id, upload_id=upload_id, user_id=user_id)
             batch_ids.append(batch_id)
         return batch_ids
     except Exception as error:

@@ -1,90 +1,94 @@
-import asyncio
-from typing import Dict, AsyncGenerator
-from pydantic import BaseModel, Field
 from datetime import datetime
 
+from typing import AsyncGenerator, Literal, Optional
 
-class BatchProgress(BaseModel):
-    batch_id: str
-    total_files: int
-    processed_files: int = 0
-    successful_files: int = 0
-    failed_files: int = 0
-    progress_percent: float = 0.0
-    current_file: str = ""
-    status: str = "processing"  # "processing", "completed", "failed"
-    updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+from models.upload_progress import UploadProgress
+
+import asyncio
 
 
-class BatchProgressTracker:
+class UploadProgressTracker:
     """
-    In-memory singleton tracker that handles real-time batch progress
-    updates and streams Server-Sent Events (SSE) to active client listeners.
+    In-memory singleton class tracking batch states and managing
+    asyncio queues for SSE event broadcasting.
     """
 
     def __init__(self):
-        self._batches: Dict[str, BatchProgress] = {}
-        self._listeners: Dict[str, list[asyncio.Queue]] = {}
+        self._uploads: dict[str, UploadProgress] = {}
 
-    def register_batch(self, batch_id: str, total_files: int) -> BatchProgress:
-        progress = BatchProgress(batch_id=batch_id, total_files=total_files)
-        self._batches[batch_id] = progress
-        self._listeners[batch_id] = []
+        # maps each upload_id to a list of active asyncio.Queue conns for live progress updates 
+        self._listeners: dict[str, list[asyncio.Queue]] = {}
+
+    def register_upload(self, upload_id: str, total_files: int, user_id: str="default_user")->UploadProgress:
+        progress =UploadProgress(upload_id=upload_id, user_id=user_id, total_files=total_files)
+        self._uploads[upload_id] = progress
+        self._listeners[upload_id] = []
         return progress
 
-    async def update_file_status(self, batch_id: str, file_name: str, success: bool):
-        if batch_id not in self._batches:
-            # Fallback auto-registration if batch was initiated prior to tracker startup
-            self.register_batch(batch_id, total_files=20)
+    async def update_file_status(self, upload_id: str, file_name: str, outcome: Literal["success", "review", "failed"])->None:
+        """
+        Mutates batch state metrics and pushes updates to subscribers.
+        """
+        if upload_id not in self._uploads:
+            return
 
-        progress = self._batches[batch_id]
-        progress.processed_files += 1
+        progress = self._uploads[upload_id]
         progress.current_file = file_name
-        if success:
+        
+        if outcome == "success":
             progress.successful_files += 1
-        else:
+        elif outcome == "review":
+            progress.review_files += 1
+        elif outcome == "failed":
             progress.failed_files += 1
-
-        progress.progress_percent = round(
-            (progress.processed_files / max(1, progress.total_files)) * 100, 1
-        )
-        if progress.processed_files >= progress.total_files:
+        if progress.finished_processed >= progress.total_files:
             progress.status = "completed"
 
         progress.updated_at = datetime.now().isoformat()
 
-        # Dispatch updates to registered SSE queues
-        for queue in list(self._listeners.get(batch_id, [])):
+        for queue in list(self._listeners.get(upload_id, [])):
             await queue.put(progress)
 
-    async def subscribe(self, batch_id: str) -> AsyncGenerator[str, None]:
+    async def subscribe(self, upload_id: str)->AsyncGenerator[str, None]:
+        """
+        Returns an async generator which streams real-time UploadProgress via SSE
+        """
         queue: asyncio.Queue = asyncio.Queue()
-        if batch_id in self._listeners:
-            self._listeners[batch_id].append(queue)
-        else:
-            self._listeners[batch_id] = [queue]
 
-        # Send initial snapshot immediately
-        if batch_id in self._batches:
-            yield f"data: {self._batches[batch_id].model_dump_json()}\n\n"
+        # if there are upload jobs associated with this job id
+        # then append the job's queue to the existing list of queues of the job.
+        if upload_id in self._listeners:
+            self._listeners[upload_id].append(queue)
+        # if there is None -> create a new list containing the current queue. 
+        else: 
+            self._listeners[upload_id] = [queue]
 
-        try:
-            while True:
-                # Wait for next progress event with a timeout safety net
-                try:
-                    progress: BatchProgress = await asyncio.wait_for(
-                        queue.get(), timeout=30.0
-                    )
-                    yield f"data: {progress.model_dump_json()}\n\n"
-                    if progress.status == "completed":
-                        break
-                except asyncio.TimeoutError:
-                    # Keep-alive heartbeat comment for SSE connection stability
-                    yield ": keep-alive\n\n"
-        finally:
-            if batch_id in self._listeners and queue in self._listeners[batch_id]:
-                self._listeners[batch_id].remove(queue)
+        if upload_id in self._uploads:
+            yield f"data: {self._uploads[upload_id].model_dump_json()}\n\n"
+        
+        try: 
+            # Continuously stream live updates until the batch completes
+            while True: 
+                # Wait for next progress event with a 60s timeout safety net
+                progress: UploadProgress = await asyncio.wait_for(queue.get(), timeout=60.0)
+                
+                # Format and yield serialized payload as W3C SSE event frame
+                yield f"data: {progress.model_dump_json()}\n\n"
 
+                # Close stream naturally once batch reaches 100% completion
+                if progress.status == "completed": 
+                    break
+        
+        except asyncio.TimeoutError:
+            # Send SSE comment heartbeat ping to prevent proxy/browser TCP timeouts
+            yield ": keep-alive\n\n"
 
-# Global tracker instance
-progress_tracker = BatchProgressTracker()
+        finally: 
+            # Cleanup queue on client disconnect or completion to prevent memory leaks
+            if upload_id in self._listeners and queue in self._listeners[upload_id]:
+                self._listeners[upload_id].remove(queue)
+
+# ------------------------------------------------------------------
+# Global Singleton Instance Export
+# ------------------------------------------------------------------
+upload_progress_tracker = UploadProgressTracker()
