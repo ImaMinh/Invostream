@@ -115,8 +115,11 @@ CREATE TABLE invoices (
     content_hash CHAR(64) UNIQUE,
     total_processing_time_ms Integer DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    user_id VARCHAR(255) DEFAULT NULL
 );
+
+CREATE INDEX IF NOT EXISTS idx_invoices_user_id ON invoices(user_id);
 
 CREATE TABLE IF NOT EXISTS invoice_line_items (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

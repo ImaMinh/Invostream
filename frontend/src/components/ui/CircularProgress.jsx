@@ -11,7 +11,7 @@ const CircularProgress = ({ value, total, colorClass, strokeColor, centerSubtext
   const strokeDashoffset = circumference - progressRatio * circumference;
 
   return (
-    <div className="relative w-[140px] h-[140px] flex items-center justify-center mx-auto my-2">
+    <div className="relative w-[115px] h-[115px] sm:w-[140px] sm:h-[140px] flex items-center justify-center mx-auto my-1 sm:my-2">
       <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 100 100">
         {/* Underlying Background Track Circle */}
         <circle
@@ -59,11 +59,11 @@ const CircularProgress = ({ value, total, colorClass, strokeColor, centerSubtext
 
       {/* Center Text Content */}
       <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-        <span className="text-[1.6rem]  tracking-tight leading-none text-[var(--text-primary)] transition-colors duration-500">
+        <span className="text-[1.3rem] sm:text-[1.6rem] tracking-tight leading-none text-[var(--text-primary)] transition-colors duration-500">
           {singleNumberOnly ? value : `${value} / ${total}`}
         </span>
         {centerSubtext && (
-          <span className="text-[0.8rem] font-normal leading-tight mt-0.1 text-[var(--text-subtext)] transition-colors duration-500">
+          <span className="text-[0.7rem] sm:text-[0.8rem] font-normal leading-tight mt-0.5 text-[var(--text-subtext)] transition-colors duration-500">
             {centerSubtext}
           </span>
         )}

@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useAuth } from '@clerk/clerk-react';
+import { fetchWithAuth } from '../lib/apiClient';
 import { ArrowLeft, Save, Loader2, FileText } from 'lucide-react';
 
 export default function InvoiceDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { getToken } = useAuth();
   const [invoice, setInvoice] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -50,7 +53,7 @@ export default function InvoiceDetail() {
   ];
 
   useEffect(() => {
-    fetch(`http://localhost:8000/api/invoices/invoice/${id}`)
+    fetchWithAuth(`http://localhost:8000/api/invoices/invoice/${id}`, {}, getToken)
       .then(res => res.json())
       .then(data => {
         setInvoice(data);
@@ -87,13 +90,13 @@ export default function InvoiceDetail() {
     });
 
     try {
-      const response = await fetch(`http://localhost:8000/api/invoices/invoice/${id}`, {
+      const response = await fetchWithAuth(`http://localhost:8000/api/invoices/invoice/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(payload)
-      });
+      }, getToken);
       
       if (response.ok) {
         alert("Invoice updated successfully. Status changed to 'success'.");

@@ -1,22 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { UploadCloud, Loader2, FileText, FileCheck, FileSearch, FileX, Timer, FolderPlus, FilePlus } from 'lucide-react';
-import WireframeMeshCanvas from '../components/background/WireframeMeshCanvas';
 import BentoCard from '../components/ui/BentoCard';
 import CircularProgress from '../components/ui/CircularProgress';
 import Alert from '../components/ui/Alert';
 
+// components for authentication 
+import { useAuth } from '@clerk/clerk-react';
 import { useUpload } from '../context/UploadContext';
+import { useTheme } from '../context/ThemeContext';
+import { fetchWithAuth } from '../lib/apiClient';
 
 export default function Upload() {
-  const [isScrolled, setIsScrolled] = useState(false);
-  // Theme switch handler for `isScrolled`. 
-  useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 40);
-    };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  const { getToken } = useAuth(); // getToken is an async function that retrieves the active user's signed Session JWT token from Clerk
+  const { isScrolled } = useTheme();
 
 
   const [files, setFiles] = useState([]);
@@ -67,10 +63,10 @@ export default function Upload() {
       const formData = new FormData();
       files.forEach(file => formData.append('folder', file));
       
-      const response = await fetch('http://localhost:8000/invoices/batch', { 
+      const response = await fetchWithAuth('http://localhost:8000/invoices/batch', { 
         method: 'POST', 
         body: formData 
-      });
+      }, getToken);
 
       if (!response.ok) {
         throw new Error(`Upload failed with status: ${response.status}`);
@@ -99,40 +95,24 @@ export default function Upload() {
 
   return (
     <div
-      className={`relative min-h-screen p-6 lg:p-8 font-sans transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] bg-[var(--page-bg)] text-[var(--page-text)] ${isScrolled ? 'theme-light' : 'theme-dark'}`}
+      className={`relative min-h-screen p-4 sm:p-6 lg:p-8 font-sans transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] bg-[var(--page-bg)] text-[var(--page-text)] ${isScrolled ? 'theme-light' : 'theme-dark'}`}
     >
-      {/* Layer 1: ambient blurred gradient blobs */}
-      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden transition-opacity duration-700">
-        {isScrolled ? (
-          <>
-            <div className="absolute inset-0 bg-slate-50" />
-            <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-[radial-gradient(ellipse_at_center,rgba(224,242,254,0.85),transparent_70%)] blur-[90px]" />
-            <div className="absolute top-[25%] right-[-10%] w-[650px] h-[650px] bg-[radial-gradient(ellipse_at_center,rgba(241,245,249,0.95),transparent_70%)] blur-[100px]" />
-            <div className="absolute bottom-[-10%] left-[-10%] w-[700px] h-[700px] bg-[radial-gradient(ellipse_at_center,rgba(238,242,255,0.85),transparent_70%)] blur-[110px]" />
-          </>
-        ) : (
-          <>
-            <div className="absolute inset-0 bg-zinc-950" />
-            <div className="absolute top-[-15%] left-1/2 -translate-x-1/2 w-[1100px] h-[650px] bg-[radial-gradient(ellipse_at_center,rgba(30,58,138,0.18),transparent_70%)] blur-[90px]" />
-            <div className="absolute top-[20%] right-[-10%] w-[650px] h-[650px] bg-[radial-gradient(ellipse_at_center,rgba(15,23,42,0.60),transparent_70%)] blur-[100px]" />
-            <div className="absolute bottom-[-10%] left-[-10%] w-[750px] h-[750px] bg-[radial-gradient(ellipse_at_center,rgba(14,165,233,0.08),transparent_70%)] blur-[110px]" />
-          </>
-        )}
-      </div>
+      {/* Layer 1: Solid matte background with no gradient or glow */}
+      <div className="fixed inset-0 z-0 pointer-events-none bg-[var(--page-bg)] transition-colors duration-500" />
 
       {/* Layer 2: grid mesh, sits above the blobs, below content */}
-      <WireframeMeshCanvas isScrolled={isScrolled} heightVh={25} />
+      {/*   <WireframeMeshCanvas isScrolled={isScrolled} heightVh={25} /> */}
 
       
-      <div className="relative z-10 max-w-6xl mx-auto space-y-2.5 flex flex-col gap-2.5">
+      <div className="relative z-10 max-w-6xl mx-auto space-y-2 sm:space-y-2.5 flex flex-col gap-2 sm:gap-2.5">
         {/* 1. UPLOAD SECTION */}
         <BentoCard 
           isScrolled={isScrolled}
         >
-          <div className="p-4 sm:p-5 text-center relative transition-colors duration-500 bg-[var(--bento-inner-bg)]">
+          <div className="p-3 sm:p-5 text-center relative transition-colors duration-500 bg-[var(--bento-inner-bg)]">
             
-            {/* Softened Dashed File Upload Container */}
-            <div className="border-2 border-dashed rounded-xl p-6 sm:p-12 flex flex-col items-center justify-center relative z-10 transition-colors duration-500 bg-[var(--dropzone-bg)] border-[var(--dropzone-border)]">
+            {/* Softened Dashed File Upload Container - Taller on mobile */}
+            <div className="border-2 border-dashed rounded-xl py-10 px-4 sm:py-14 sm:px-12 min-h-[240px] sm:min-h-[220px] flex flex-col items-center justify-center relative z-10 transition-colors duration-500 bg-[var(--dropzone-bg)] border-[var(--dropzone-border)]">
               
               {/* Custom Texture Overlay */}
               <div 
@@ -172,9 +152,9 @@ export default function Upload() {
               <button 
                 type="button"
                 onClick={triggerFileInput}
-                className="relative z-10 font-semibold text-base px-12 py-1.5 rounded-md transition-all duration-200 cursor-pointer flex items-center gap-2.5 shadow-md bg-[var(--btn-select-bg)] hover:bg-[var(--btn-select-hover-bg)] text-[var(--btn-select-text)] border border-[var(--btn-select-border)] shadow-[var(--btn-select-shadow)]"
+                className="relative z-10 font-semibold text-sm sm:text-base px-8 sm:px-12 py-2 sm:py-1.5 rounded-md transition-all duration-200 cursor-pointer flex items-center gap-2.5 shadow-md bg-[var(--btn-select-bg)] hover:bg-[var(--btn-select-hover-bg)] text-[var(--btn-select-text)] border border-[var(--btn-select-border)] shadow-[var(--btn-select-shadow)]"
               >
-                <FolderPlus className="w-5 h-5" />
+                <FolderPlus className="w-4 h-4 sm:w-5 sm:h-5" />
                 <span>Select Files</span>
               </button>
 
@@ -195,15 +175,15 @@ export default function Upload() {
 
             {/* Selected File Summary & Submit Action */}
             {files.length > 0 && (
-              <div className="relative z-10 mt-4 pt-4 border-t flex flex-col sm:flex-row items-center justify-between gap-4 transition-colors duration-500 border-[var(--staged-row-border)]">
-                <div className="text-sm font-medium text-[var(--staged-text-color)]">
+              <div className="relative z-10 mt-3 pt-3 sm:mt-4 sm:pt-4 border-t flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 transition-colors duration-500 border-[var(--staged-row-border)]">
+                <div className="text-xs sm:text-sm font-medium text-[var(--staged-text-color)]">
                   {files.length} file{files.length > 1 ? 's' : ''} staged for extraction
                 </div>
                 <button
                   type="button"
                   onClick={handleUpload}
                   disabled={uploading}
-                  className="bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white font-medium px-5 py-2 rounded-none text-sm flex items-center gap-2 transition-all cursor-pointer border-0"
+                  className="bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white font-medium px-5 py-2 rounded-none text-xs sm:text-sm flex items-center gap-2 transition-all cursor-pointer border-0"
                 >
                   {uploading ? (
                     <><Loader2 className="w-4 h-4 animate-spin" /> Uploading Batch...</>
@@ -229,19 +209,19 @@ export default function Upload() {
           </div>
         </BentoCard>
 
-        {/* SUMMARY HEADING (Standalone Text with breathing room) */}
-        <div className="mt-4 mb-6 flex items-center gap-2 px-1">
-          <h1 className="text-xl font-bold tracking-tight text-[var(--text-primary)] transition-colors duration-500">
+        {/* SUMMARY HEADING (Compact margins) */}
+        <div className="mt-2 mb-2 sm:mt-4 sm:mb-4 flex items-center gap-2 px-1">
+          <h1 className="text-lg sm:text-xl font-bold tracking-tight text-[var(--text-primary)] transition-colors duration-500">
             Summary
           </h1>
-          <Timer className="w-4.5 h-4.5 text-[var(--summary-timer-color)] transition-colors duration-500" />
+          <Timer className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-[var(--summary-timer-color)] transition-colors duration-500" />
         </div>
 
         {/* 2. LIVE PROCESSING */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-2.5">
           {/* Left Card: PROCESSING */}
           <BentoCard isScrolled={isScrolled} disableHover={true}>
-            <div className="p-5 flex flex-col justify-between items-center text-center min-h-[210px] h-full relative">
+            <div className="p-3 sm:p-5 flex flex-col justify-between items-center text-center min-h-[160px] sm:min-h-[210px] h-full relative">
               <div className="absolute -top-10 -left-10 w-48 h-48 bg-white/5 rounded-full blur-[48px] pointer-events-none"></div>
               
               <div className="w-full flex items-center justify-between z-10">
@@ -251,7 +231,7 @@ export default function Upload() {
                 </div>
               </div>
 
-              <div className="z-10 my-2">
+              <div className="z-10 my-1 sm:my-2">
                 <CircularProgress 
                   value={metrics.under_process} 
                   total={metrics.total_files} 
@@ -261,7 +241,7 @@ export default function Upload() {
               </div>
 
               <div className="z-10 w-full text-center">
-                <span className="text-xs font-medium text-[var(--card-processing-footer)] transition-colors duration-500">
+                <span className="text-[11px] sm:text-xs font-medium text-[var(--card-processing-footer)] transition-colors duration-500">
                   {metrics.total_files > 0 ? Math.round((metrics.under_process / metrics.total_files) * 100) : 0}% of current batch
                 </span>
               </div>
@@ -270,7 +250,7 @@ export default function Upload() {
 
           {/* Right Card: COMPLETED */}
           <BentoCard isScrolled={isScrolled} disableHover={true}>
-            <div className="p-5 flex flex-col justify-between items-center text-center min-h-[210px] h-full relative">
+            <div className="p-3 sm:p-5 flex flex-col justify-between items-center text-center min-h-[160px] sm:min-h-[210px] h-full relative">
               <div className="absolute -bottom-10 -right-10 w-48 h-48 bg-white/5 rounded-full blur-[48px] pointer-events-none"></div>
 
               <div className="w-full flex items-center justify-between z-10">
@@ -281,7 +261,7 @@ export default function Upload() {
                 <span className="w-2 h-2 rounded-full bg-[var(--pulse-completed-dot)] shadow-[0_0_8px_var(--pulse-completed-dot)] transition-colors duration-500"></span>
               </div>
 
-              <div className="z-10 my-2">
+              <div className="z-10 my-1 sm:my-2">
                 <CircularProgress 
                   value={metrics.finished_processed} 
                   total={metrics.total_files} 
@@ -291,7 +271,7 @@ export default function Upload() {
               </div>
 
               <div className="z-10 w-full text-center">
-                <span className="text-xs font-medium text-[var(--card-completed-footer)] transition-colors duration-500">
+                <span className="text-[11px] sm:text-xs font-medium text-[var(--card-completed-footer)] transition-colors duration-500">
                   {metrics.total_files > 0 ? Math.round((metrics.finished_processed / metrics.total_files) * 100) : 0}% batch finished
                 </span>
               </div>
@@ -300,10 +280,10 @@ export default function Upload() {
         </div>
 
         {/* 3. RESULTS BREAKDOWN */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 sm:gap-2.5">
           {/* Card 1: SUCCESS */}
           <BentoCard isScrolled={isScrolled} disableHover={true}>
-            <div className="p-5 flex flex-col justify-between items-center text-center min-h-[230px] h-full relative">
+            <div className="p-3 sm:p-5 flex flex-col justify-between items-center text-center min-h-[160px] sm:min-h-[230px] h-full relative">
               <div className="absolute inset-0 bg-white/5 blur-2xl pointer-events-none"></div>
 
               <div className="w-full flex items-center gap-1.5 z-10">
@@ -311,15 +291,15 @@ export default function Upload() {
                 <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-primary)] transition-colors duration-500">SUCCESS</span>
               </div>
 
-              <div className="z-10 my-2">
+              <div className="z-10 my-1 sm:my-2">
                 <CircularProgress 
                   value={metrics.successful_files} 
                   total={metrics.total_files} 
                 />
               </div>
 
-              <div className="z-10 mt-2">
-                <span className="text-sm font-medium text-[var(--card-success-footer)] transition-colors duration-500">
+              <div className="z-10 mt-1 sm:mt-2">
+                <span className="text-xs sm:text-sm font-medium text-[var(--card-success-footer)] transition-colors duration-500">
                   {metrics.finished_processed > 0 ? ((metrics.successful_files / metrics.finished_processed) * 100).toFixed(1) : '100'}% Parse Accuracy
                 </span>
               </div>
@@ -328,7 +308,7 @@ export default function Upload() {
 
           {/* Card 2: REVIEW */}
           <BentoCard isScrolled={isScrolled} disableHover={true}>
-            <div className="p-5 flex flex-col justify-between items-center text-center min-h-[230px] h-full relative">
+            <div className="p-3 sm:p-5 flex flex-col justify-between items-center text-center min-h-[160px] sm:min-h-[230px] h-full relative">
               <div className="absolute inset-0 bg-white/5 blur-2xl pointer-events-none"></div>
 
               <div className="w-full flex items-center gap-1.5 z-10">
@@ -336,7 +316,7 @@ export default function Upload() {
                 <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-primary)] transition-colors duration-500">REVIEW</span>
               </div>
 
-              <div className="z-10 my-2">
+              <div className="z-10 my-1 sm:my-2">
                 <CircularProgress 
                   value={metrics.review_files} 
                   total={metrics.total_files} 
@@ -344,15 +324,15 @@ export default function Upload() {
                 />
               </div>
 
-              <div className="z-10 mt-2">
-                <span className="text-sm font-medium text-[var(--card-review-footer)] transition-colors duration-500">Manual Intervention Required</span>
+              <div className="z-10 mt-1 sm:mt-2">
+                <span className="text-xs sm:text-sm font-medium text-[var(--card-review-footer)] transition-colors duration-500">Manual Intervention Required</span>
               </div>
             </div>
           </BentoCard>
 
           {/* Card 3: FAILED */}
           <BentoCard isScrolled={isScrolled} disableHover={true}>
-            <div className="p-5 flex flex-col justify-between items-center text-center min-h-[230px] h-full relative">
+            <div className="p-3 sm:p-5 flex flex-col justify-between items-center text-center min-h-[160px] sm:min-h-[230px] h-full relative">
               <div className="absolute inset-0 bg-white/5 blur-2xl pointer-events-none"></div>
 
               <div className="w-full flex items-center gap-1.5 z-10">
@@ -360,15 +340,15 @@ export default function Upload() {
                 <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-primary)] transition-colors duration-500">FAILED</span>
               </div>
 
-              <div className="z-10 my-2">
+              <div className="z-10 my-1 sm:my-2">
                 <CircularProgress 
                   value={metrics.failed_files} 
                   total={metrics.total_files} 
                 />
               </div>
 
-              <div className="z-10 mt-2">
-                <span className="text-sm font-medium text-[var(--card-failed-footer)] transition-colors duration-500">Invalid File Format / Corrupt PDF</span>
+              <div className="z-10 mt-1 sm:mt-2">
+                <span className="text-xs sm:text-sm font-medium text-[var(--card-failed-footer)] transition-colors duration-500">Invalid File Format / Corrupt PDF</span>
               </div>
             </div>
           </BentoCard>

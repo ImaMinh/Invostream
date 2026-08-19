@@ -29,6 +29,7 @@ class Invoice(BaseModel):
     # identifiers / tracking
     job_id: str
     file_name: str
+    user_id: Optional[str] = None
     # status can be: success, review, failed.
     status: str
     # reason for current status

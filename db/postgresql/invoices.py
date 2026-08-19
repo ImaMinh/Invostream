@@ -72,6 +72,7 @@ async def insert_invoice(extracted_data: Invoice) -> str:
     fields = {
         "job_id":                        extracted_data.job_id,
         "file_name":                     extracted_data.file_name,
+        "user_id":                       extracted_data.user_id,
         "status":                        extracted_data.status,
         "reason":                        extracted_data.reason,
         "template_name":                 extracted_data.template_name,

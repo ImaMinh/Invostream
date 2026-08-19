@@ -9,6 +9,7 @@ from models.invoice import Invoice
 from models.batch import DuplicateFileInfo
 from services.dedup.deduplication import compute_hash, find_existing
 
+from services.telemetry.progress import upload_progress_tracker
 from ocr.extraction_main import extract_invoices
 
 # --- Pipeline Queue Configurations ---
@@ -25,11 +26,10 @@ INGEST_TO_PRODUCER: asyncio.Queue = asyncio.Queue(maxsize=RAW_QUEUE_MAXSIZE)
 PRODUCER_CONSUMER_BUFFER: asyncio.Queue = asyncio.Queue(maxsize=DEDUPED_QUEUE_MAXSIZE)
 
 
-from services.telemetry.progress import progress_tracker
 
 
 # -------------- STAGE 0: SAVE RAW FILES TO DISK & ENQUEUE TO QUEUE 1 -------------- #
-async def save_raw_batch(chunk: list[UploadFile], batch_id: str) -> list[str]:
+async def save_raw_batch(chunk: list[UploadFile], batch_id: str, upload_id: str = "", user_id: str | None = None) -> list[str]:
     """
     Saves a chunk of up to 20 raw uploaded files into data/raw/{batch_id}
     and enqueues the folder + batch UUID into INGEST_TO_PRODUCER (Queue 1).
@@ -50,20 +50,19 @@ async def save_raw_batch(chunk: list[UploadFile], batch_id: str) -> list[str]:
                 f.write(raw_bytes)
             saved_file_paths.append(file_path)
 
-        # Register batch in progress tracker for SSE streaming
-        progress_tracker.register_batch(batch_id, total_files=len(saved_file_paths))
-
-        # Push raw job payload (folder + 20 files + batch UUID) to Queue 1
+        # push raw job payload (folder + 20 files + batch UUID + upload UUID + user_id) to Queue 1
         await INGEST_TO_PRODUCER.put(
             {
                 "batch_id": batch_id,
+                "upload_id": upload_id,
+                "user_id": user_id,
                 "folder_path": save_dir,
                 "file_paths": saved_file_paths,
             }
         )
 
         print(
-            f"<API INGESTION> Saved folder of {len(saved_file_paths)} files for batch {batch_id} -> Pushed to INGEST_TO_PRODUCER."
+            f"<API INGESTION> Saved folder of {len(saved_file_paths)} files for batch {batch_id} (upload_id: {upload_id}) -> Pushed to INGEST_TO_PRODUCER."
         )
         return saved_file_paths
 
@@ -87,13 +86,14 @@ async def producer_worker(producer_id: int):
         try:
             job = await INGEST_TO_PRODUCER.get()
             batch_id = job["batch_id"]
+            upload_id = job.get("upload_id", "")
             file_paths = job["file_paths"]
 
             print(
-                f"<PRODUCER-{producer_id}> Picked up batch {batch_id} ({len(file_paths)} files). Computing hashes & checking duplicates..."
+                f"<PRODUCER-{producer_id}> Picked up batch {batch_id} ({len(file_paths)} files, upload_id: {upload_id}). Computing hashes & checking duplicates..."
             )
 
-            # 1. Read file bytes & compute content hashes
+            # read file bytes & compute content hashes
             file_data: list[tuple[str, bytes, str]] = []
             for path in file_paths:
                 if not os.path.exists(path):
@@ -103,11 +103,11 @@ async def producer_worker(producer_id: int):
                 content_hash = compute_hash(content_bytes)
                 file_data.append((path, content_bytes, content_hash))
 
-            # 2. Check DB for existing hashes
+            # check DB for existing hashes
             all_hashes = [h for _, _, h in file_data]
             existing_hashes = await find_existing(all_hashes)
 
-            # 3. Separate novel files from duplicates
+            # separate novel files from duplicates
             novel_file_paths = []
             duplicates = []
             seen_in_batch = set()
@@ -123,17 +123,24 @@ async def producer_worker(producer_id: int):
                     print(
                         f"<PRODUCER-{producer_id}> Skipped duplicate file: {file_name} (hash: {content_hash[:12]}...)"
                     )
+                    # Status: "failed" due to duplicate file detection (already exists in DB or repeated in batch)
+                    if upload_id:
+                        await upload_progress_tracker.update_file_status(
+                            upload_id=upload_id, file_name=file_name, outcome="failed"
+                        )
                 else:
                     novel_file_paths.append(path)
                     seen_in_batch.add(content_hash)
 
-            # 4. Append to Queue 2 for consumers to poll
-            if novel_file_paths:
-                # await enqueue_jobs(batch_id=batch_id, file_paths=novel_file_paths)
+            user_id = job.get("user_id", None)
 
+            # append to Queue 2 for consumers to poll
+            if novel_file_paths:
                 await PRODUCER_CONSUMER_BUFFER.put(
                     {
                         "batch_id": batch_id,
+                        "upload_id": upload_id,
+                        "user_id": user_id,
                         "novel_file_paths": novel_file_paths,
                     }
                 )
@@ -168,30 +175,17 @@ async def consumer_worker(consumer_id: int):
         try:
             job = await PRODUCER_CONSUMER_BUFFER.get()
             batch_id = job["batch_id"]
+            upload_id = job.get("upload_id", "")
+            user_id = job.get("user_id", None)
             novel_file_paths = job["novel_file_paths"]
 
             print(
-                f"<CONSUMER-{consumer_id}> Processing OCR & DB insertion for batch {batch_id} ({len(novel_file_paths)} files)..."
+                f"<CONSUMER-{consumer_id}> Processing OCR & DB insertion for batch {batch_id} ({len(novel_file_paths)} files, upload_id: {upload_id}, user_id: {user_id})..."
             )
 
             # Execute OCR extraction and immediate DB insertion concurrently via Azure DI
-            extraction_results = await extract_invoices(novel_file_paths, batch_id)
+            extraction_results = await extract_invoices(novel_file_paths, batch_id=batch_id, upload_id=upload_id, user_id=user_id)
 
-            # # Insert extracted results into PostgreSQL
-            # saved_count = 0
-            # for invoice in extraction_results:
-            #     try:
-            #         invoice_uuid = await insert_invoice(invoice)
-
-            #         if invoice_uuid is None:
-            #             continue
-            #         saved_count += 1
-            #         print(f"<CONSUMER-{consumer_id}> Inserted invoice '{invoice.file_name}' -> UUID: {invoice_uuid}")
-            #     except Exception as e:
-            #         print(f"<CONSUMER-{consumer_id}> Error inserting invoice record for batch {batch_id}: {e}")
-            #         traceback.print_exc()
-
-            # print(f"<CONSUMER-{consumer_id}> Successfully processed batch {batch_id} ({saved_count}/{len(extraction_results)} inserted).")
             print(
                 f"<CONSUMER-{consumer_id}> Successfully processed batch {batch_id} ({len(extraction_results)} inserted)."
             )
@@ -212,8 +206,6 @@ async def main_process():
     - Queue 1 (INGEST_TO_PRODUCER): Consumed by Producers (Hash calculation & Deduplication)
     - Queue 2 (PRODUCER_CONSUMER_BUFFER): Consumed by Consumers (OCR extraction & DB insertion)
     """
-    # max_cpus = min(3, os.cpu_count() or 1)
-    # executor = ProcessPoolExecutor(max_workers=max_cpus)
 
     print(
         f"<MAIN PROCESS> Starting {NUM_PRODUCERS} Producers and {NUM_CONSUMERS} Consumers..."

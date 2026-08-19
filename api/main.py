@@ -1,14 +1,13 @@
 import os, sys, asyncio, uuid
 
-# Add project root to sys.path so modules like `db`, `pipeline`, `models` resolve cleanly
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
 # import FastAPI modules
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, UploadFile, HTTPException, APIRouter, File, BackgroundTasks
+from fastapi import FastAPI, UploadFile, HTTPException, APIRouter, File, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+
+from services.security.clerk_auth import verify_clerk_token
 
 # import pydantic validation error
 from pydantic import ValidationError
@@ -16,8 +15,8 @@ from pydantic import ValidationError
 # import the modules:
 from pipeline import ingest
 from pipeline.orchestrator import main_process
-from api.frontend import dashboard
 from api.frontend import invoices
+from api.frontend import telemetry 
 
 # import pydantic models
 from models.batch import BatchUploadResponse
@@ -68,16 +67,21 @@ app.mount("/data/raw", StaticFiles(directory="data/raw"), name="raw_data")
 
 # === API for orchestrating files from `Upload Folder` === #
 @router.post("/invoices/batch")
-async def upload_batch(folder: list[UploadFile] = File(...))->BatchUploadResponse:  
+async def upload_batch(
+    folder: list[UploadFile] = File(...),
+    user: dict = Depends(verify_clerk_token)
+) -> BatchUploadResponse:  
     try:
+        # TODO: Add guard: if not folder: raise HTTPException(status_code=400, detail="No files uploaded")
 
         # register the upload job
         upload_id = str(uuid.uuid4())
+        user_id = user.get("sub")
 
         upload_progress_tracker.register_upload(upload_id=upload_id, total_files=len(folder))
         
-        # pass the uploaded HTTP files to the pipeline ingest module.
-        await ingest.ingest(folder, upload_id=upload_id)
+        # pass the uploaded HTTP files and user_id to the pipeline ingest module.
+        await ingest.ingest(folder, upload_id=upload_id, user_id=user_id)
 
         return BatchUploadResponse(status="pending", upload_id=upload_id)
     except ValidationError as validationError:
@@ -88,5 +92,5 @@ async def upload_batch(folder: list[UploadFile] = File(...))->BatchUploadRespons
         raise HTTPException(status_code=500, detail=str(error))
 
 app.include_router(router)
-app.include_router(dashboard.router)
 app.include_router(invoices.router)
+app.include_router(telemetry.router)
