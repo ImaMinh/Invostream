@@ -24,7 +24,7 @@ export function useReviewInvoices() {
 
   const fetchInvoices = () => {
     setLoading(true);
-    fetchWithAuth('http://localhost:8000/api/invoices/review-invoices', {}, getToken)
+    fetchWithAuth('/api/invoices/review-invoices', {}, getToken)
       .then(res => res.json())
       .then(data => {
         setInvoices(Array.isArray(data) ? data : []);
@@ -90,7 +90,7 @@ export function useReviewInvoices() {
 
     try {
       await fetchWithAuth(
-        `http://localhost:8000/api/invoices/invoice/${invoiceId}/resolve-duplicate`,
+        `/api/invoices/invoice/${invoiceId}/resolve-duplicate`,
         { method: 'POST' },
         getToken
       );
@@ -105,7 +105,7 @@ export function useReviewInvoices() {
       return;
     }
     try {
-      const res = await fetchWithAuth(`http://localhost:8000/api/invoices/invoice/${invoiceId}`, {
+      const res = await fetchWithAuth(`/api/invoices/invoice/${invoiceId}`, {
         method: 'DELETE'
       }, getToken);
       if (res.ok) {

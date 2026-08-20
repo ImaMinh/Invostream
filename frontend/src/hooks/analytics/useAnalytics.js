@@ -22,8 +22,8 @@ export function useAnalytics() {
     setError(null);
     try {
       const [latencyRes, ipmRes] = await Promise.all([
-        fetchWithAuth('http://localhost:8000/api/telemetry/system/monthly-latency', {}, getToken),
-        fetchWithAuth('http://localhost:8000/api/telemetry/system/monthly-ipm', {}, getToken)
+        fetchWithAuth('/api/telemetry/system/monthly-latency', {}, getToken),
+        fetchWithAuth('/api/telemetry/system/monthly-ipm', {}, getToken)
       ]);
 
       if (!latencyRes.ok || !ipmRes.ok) {

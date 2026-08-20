@@ -51,7 +51,7 @@ export function useUploadBatch() {
       const formData = new FormData();
       files.forEach(file => formData.append('folder', file));
 
-      const response = await fetchWithAuth('http://localhost:8000/invoices/batch', {
+      const response = await fetchWithAuth('/invoices/batch', {
         method: 'POST',
         body: formData
       }, getToken);

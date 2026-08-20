@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@clerk/clerk-react';
-import { fetchWithAuth } from '../../lib/apiClient';
+import { fetchWithAuth, API_BASE_URL } from '../../lib/apiClient';
 import { allEditableFields } from '../../utils/detail/detailFieldConfig';
 import { toPascalCase } from '../../utils/general/textUtils';
 
@@ -34,7 +34,7 @@ export function useInvoiceDetail() {
   // Fetch invoice details
   const fetchInvoiceDetail = () => {
     setLoading(true);
-    fetchWithAuth(`http://localhost:8000/api/invoices/invoice/${id}`, {}, getToken)
+    fetchWithAuth(`/api/invoices/invoice/${id}`, {}, getToken)
       .then(res => res.json())
       .then(data => {
         setInvoice(data);
@@ -83,7 +83,7 @@ export function useInvoiceDetail() {
     try {
       // submit updated invoice payload to the api
       const response = await fetchWithAuth(
-        `http://localhost:8000/api/invoices/invoice/${id}`,
+        `/api/invoices/invoice/${id}`,
         {
           method: 'PUT',
           headers: {
@@ -118,7 +118,7 @@ export function useInvoiceDetail() {
     setDeleting(true);
     try {
       const response = await fetchWithAuth(
-        `http://localhost:8000/api/invoices/invoice/${id}`,
+        `/api/invoices/invoice/${id}`,
         {
           method: 'DELETE'
         },
@@ -158,7 +158,7 @@ export function useInvoiceDetail() {
   const documentUrl = useMemo(() => {
     if (!invoice?.file_name) return null;
     const folderId = invoice.job_id ? invoice.job_id.split('_')[0] : '';
-    return `http://localhost:8000/data/raw/${folderId}/${invoice.file_name}`;
+    return `${API_BASE_URL}/data/raw/${folderId}/${invoice.file_name}`;
   }, [invoice]);
 
   const isPdf = invoice?.file_name?.toLowerCase().endsWith('.pdf');

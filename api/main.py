@@ -51,12 +51,24 @@ router = APIRouter()
 
 
 # configure CORS networks #
-allowed_origins = ["http://127.0.0.1:5500", "http://localhost:5173"]
-
-# -- configure the app middle ware (traffic control layer (ASGI specification)) --- #
+cors_origins_env = os.getenv("CORS_ORIGINS", "")
+if cors_origins_env:
+    allowed_origins = [origin.strip() for origin in cors_origins_env.split(",") if origin.strip()]
+    cors_regex = None
+else:
+    allowed_origins = [
+        "http://127.0.0.1:5500",
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://localhost:4173",
+        "https://invostreamer.netlify.app",
+    ]
+    
+# -- configure the app middleware (traffic control layer (ASGI specification)) --- #
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
+    allow_credentials=True,
     allow_methods=["*"],  # allows all methods, defaults to only 'GET' if not specified
     allow_headers=["*"],  # clarify this later
 )

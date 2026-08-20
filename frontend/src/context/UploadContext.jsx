@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { API_BASE_URL } from '../lib/apiClient';
 
 const UploadContext = createContext(null);
 
@@ -33,7 +34,7 @@ export function UploadProvider({ children }) {
     if (!activeUploadId) return;
 
     // Open persistent SSE stream connection to backend StreamingResponse endpoint
-    const sse = new EventSource(`http://localhost:8000/api/invoices/upload/${activeUploadId}/progress`);
+    const sse = new EventSource(`${API_BASE_URL}/api/invoices/upload/${activeUploadId}/progress`);
 
     // Handle real-time progress updates pushed from the backend
     sse.onmessage = (event) => {
