@@ -112,18 +112,6 @@ services:
       - postgres
       - kafka
 
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: invostream-frontend
-    ports:
-      - "5173:5173"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    depends_on:
-      - api
 
 volumes:
   pgdata:
