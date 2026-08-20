@@ -76,7 +76,7 @@ async def extraction_worker(
                 # Status: "failed" due to OCR extraction timeout or API exception
                 if upload_id:
                     await upload_progress_tracker.update_file_status(upload_id, file_name, "failed")
-
+ 
         except Exception as e:
             print(f"<custom_extraction.py> {file_path} error: {e!r}")
             batch_results.append(e)

@@ -89,8 +89,10 @@ async def producer_worker(producer_id: int):
             upload_id = job.get("upload_id", "")
             file_paths = job["file_paths"]
 
+            user_id = job.get("user_id", None)
+
             print(
-                f"<PRODUCER-{producer_id}> Picked up batch {batch_id} ({len(file_paths)} files, upload_id: {upload_id}). Computing hashes & checking duplicates..."
+                f"<PRODUCER-{producer_id}> Picked up batch {batch_id} ({len(file_paths)} files, upload_id: {upload_id}, user_id: {user_id}). Computing hashes & evaluating duplicates..."
             )
 
             # read file bytes & compute content hashes
@@ -103,53 +105,40 @@ async def producer_worker(producer_id: int):
                 content_hash = compute_hash(content_bytes)
                 file_data.append((path, content_bytes, content_hash))
 
-            # check DB for existing hashes
+            # check DB for existing hashes scoped to this user
             all_hashes = [h for _, _, h in file_data]
-            existing_hashes = await find_existing(all_hashes)
+            existing_hashes = await find_existing(all_hashes, user_id=user_id)
 
-            # separate novel files from duplicates
-            novel_file_paths = []
-            duplicates = []
+            # Keep all valid files for consumer processing and log duplicates
+            valid_file_paths = []
             seen_in_batch = set()
 
             for path, _, content_hash in file_data:
                 file_name = os.path.basename(path)
                 if content_hash in existing_hashes or content_hash in seen_in_batch:
-                    duplicates.append(
-                        DuplicateFileInfo(
-                            file_name=file_name, content_hash=content_hash
-                        )
-                    )
                     print(
-                        f"<PRODUCER-{producer_id}> Skipped duplicate file: {file_name} (hash: {content_hash[:12]}...)"
+                        f"<PRODUCER-{producer_id}> Duplicate file detected: {file_name} (hash: {content_hash[:12]}...). Retaining for processing & UI notification."
                     )
-                    # Status: "failed" due to duplicate file detection (already exists in DB or repeated in batch)
-                    if upload_id:
-                        await upload_progress_tracker.update_file_status(
-                            upload_id=upload_id, file_name=file_name, outcome="failed"
-                        )
                 else:
-                    novel_file_paths.append(path)
                     seen_in_batch.add(content_hash)
+                valid_file_paths.append(path)
 
-            user_id = job.get("user_id", None)
-
-            # append to Queue 2 for consumers to poll
-            if novel_file_paths:
+            # append all files to Queue 2 for consumers to process
+            if valid_file_paths:
                 await PRODUCER_CONSUMER_BUFFER.put(
                     {
                         "batch_id": batch_id,
                         "upload_id": upload_id,
                         "user_id": user_id,
-                        "novel_file_paths": novel_file_paths,
+                        "novel_file_paths": valid_file_paths,
                     }
                 )
                 print(
-                    f"<PRODUCER-{producer_id}> Enqueued batch {batch_id} with {len(novel_file_paths)} novel files to PRODUCER_CONSUMER_BUFFER."
+                    f"<PRODUCER-{producer_id}> Enqueued batch {batch_id} with {len(valid_file_paths)} files to PRODUCER_CONSUMER_BUFFER."
                 )
             else:
                 print(
-                    f"<PRODUCER-{producer_id}> Batch {batch_id} contains only duplicates. Skipping Consumer queue."
+                    f"<PRODUCER-{producer_id}> Batch {batch_id} contains no valid files on disk."
                 )
 
         except asyncio.CancelledError:

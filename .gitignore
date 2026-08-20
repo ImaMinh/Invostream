@@ -1,8 +1,27 @@
-.data/
-.github/
-.vscode/
+# Environment & IDE
 .env
-.agents/
-.claude/./db/miscellaneous/
-./test
 frontend/.env
+.vscode/
+.claude/
+.agents/
+.agent/
+
+# Data & Uploads
+.data/
+data/raw/
+./db/miscellaneous/
+./test
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Node / Frontend build
+frontend/dist/
+frontend/node_modules/
+dist/
+node_modules/
+.npm

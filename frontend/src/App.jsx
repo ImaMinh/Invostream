@@ -6,10 +6,10 @@ import 'lenis/dist/lenis.css';
 // Context & Auth
 import { UploadProvider } from './context/UploadContext';
 import { ThemeProvider } from './context/ThemeContext';
-import ProtectedRoute from './components/routes/ProtectedRoute.jsx';
+import ProtectedRoute from './components/general/ProtectedRoute.jsx';
 
 // Layout & Components
-import Navbar from './components/ui/Navbar.jsx';
+import Navbar from './components/general/Navbar.jsx';
 
 // Page Components
 import LandingPage from './pages/LandingPage';

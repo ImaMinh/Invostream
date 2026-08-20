@@ -11,9 +11,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <ClerkProvider 
       publishableKey={PUBLISHABLE_KEY} 
       afterSignOutUrl="/"
-      fallbackRedirectUrl="/review"
-      signInFallbackRedirectUrl="/review"
-      signUpFallbackRedirectUrl="/review"
+      fallbackRedirectUrl="/analytics"
+      signInFallbackRedirectUrl="/analytics"
+      signUpFallbackRedirectUrl="/analytics"
     >
       <App />
     </ClerkProvider>

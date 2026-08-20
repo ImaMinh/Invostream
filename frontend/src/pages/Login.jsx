@@ -5,62 +5,72 @@ import { SignIn } from '@clerk/clerk-react';
 export default function Login() {
   return (
     <div 
-      className="min-h-screen bg-[#0a0a0a] text-white flex flex-col justify-center items-center px-4 py-12 selection:bg-[#00E5FF] selection:text-black relative overflow-hidden"
-      style={{
-        fontFamily: "'Inter', 'Montserrat', system-ui, -apple-system, sans-serif",
-        backgroundImage: `radial-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px)`,
-        backgroundSize: '24px 24px',
-      }}
+      className="min-h-screen bg-[#08090d] text-white flex flex-col justify-center items-center px-4 py-12 selection:bg-white selection:text-black relative overflow-hidden font-sans"
     >
-      {/* Background Ambient Glows */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-[#00E5FF]/10 rounded-full blur-[140px] pointer-events-none" />
-
-      {/* Main Container */}
-      <div className="w-full max-w-md z-10 flex flex-col items-center">
+      {/* Main Unified Card Container (Bento Card Style: Darker Background & Lighter Sharp Border) */}
+      <div className="w-full max-w-[440px] z-10 rounded-none border border-white/25 bg-[#07090e] shadow-2xl overflow-hidden flex flex-col items-center">
         
-        {/* Brand Header */}
-        <div className="text-center mb-6">
-          <Link to="/" className="inline-flex items-center gap-2.5 group no-underline mb-3">
-            <div className="w-9 h-9 flex items-center justify-center rounded-lg bg-black border border-gray-800 group-hover:border-[#00E5FF]/50 transition-colors shadow-lg">
+        {/* Brand Header Inside the Card (Compact Padding) */}
+        <div className="w-full pt-5 pb-1 px-6 flex justify-center text-center">
+          <Link to="/" className="inline-flex items-center gap-2.5 group no-underline">
+            <div className="w-7 h-7 flex items-center justify-center">
               <svg width="24" height="24" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect x="16" y="2" width="19.7989" height="19.7989" transform="rotate(45 16 2)" stroke="#00E5FF" strokeWidth="2.5" fill="#0a0a0b" />
-                <polygon points="16,8 24,16 16,16" fill="#00E5FF" />
+                <rect x="16" y="2" width="19.7989" height="19.7989" transform="rotate(45 16 2)" stroke="white" strokeWidth="2.5" fill="#0a0a0b" />
+                <polygon points="16,8 24,16 16,16" fill="white" />
               </svg>
             </div>
-            <span className="text-2xl font-bold tracking-tight text-white lowercase">
+            <span 
+              className="text-xl font-bold tracking-tight text-white lowercase"
+              style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+            >
               invostream
             </span>
           </Link>
         </div>
 
-        {/* Clerk Sign In Component */}
-        {/**
-         * SignIn is a pre-built widget made by clerk. Automatically handles: 
-         *  - Email/password validation & management. 
-         *  - OAuth logins.
-         *  - Multi-factor auth.
-         *  - Mint user session tokens. 
-         */}
-        <div className="w-full flex justify-center">
+        {/* Clerk Sign In Component styled seamlessly */}
+        <div className="w-full">
           <SignIn 
-            routing="path" // instruct Clerk to handle navigation using standard client-side URL
-            path="/login" // specifies the exact mount URL path where sign-in widget lives. 
+            routing="path"
+            path="/login"
             signUpUrl="/register"
-            fallbackRedirectUrl="/review"
-            forceRedirectUrl="/review"
+            fallbackRedirectUrl="/analytics"
+            forceRedirectUrl="/analytics"
             appearance={{
+              variables: {
+                colorPrimary: '#ffffff',
+                colorBackground: '#07090e',
+                colorText: '#ffffff',
+                colorTextSecondary: '#94a3b8',
+                colorInputBackground: '#040508',
+                colorInputText: '#ffffff',
+                colorNeutral: '#ffffff',
+                borderRadius: '0px',
+              },
               elements: {
-                rootBox: 'w-full flex justify-center',
-                card: 'bg-[#111111]/95 border border-gray-800/90 text-white shadow-2xl rounded-2xl backdrop-blur-xl w-full',
-                headerTitle: 'text-white font-bold text-xl',
-                headerSubtitle: 'text-gray-400 text-xs',
-                socialButtonsBlockButton: 'bg-black border border-gray-800 text-white hover:bg-gray-900',
-                formButtonPrimary: 'bg-[#00E5FF] hover:bg-[#33ebff] text-black font-bold py-2.5 rounded-xl',
-                footerActionLink: 'text-[#00E676] hover:underline font-medium',
-                formFieldInput: 'bg-black/60 border-gray-800 text-white rounded-xl',
-                formFieldLabel: 'text-gray-400 text-xs uppercase tracking-wider font-mono',
-                identityPreviewText: 'text-gray-300',
-                identityPreviewEditButtonIcon: 'text-[#00E5FF]',
+                rootBox: 'w-full',
+                cardBox: 'w-full shadow-none rounded-none border-none bg-transparent',
+                card: 'w-full bg-transparent border-none shadow-none text-white p-6 pt-0 sm:p-8 sm:pt-0 rounded-none',
+                header: 'pt-0 pb-4',
+                headerTitle: 'text-white font-bold text-xl tracking-tight font-sans text-center',
+                headerSubtitle: 'text-slate-400 text-xs font-sans text-center',
+                socialButtonsBlockButton: 'bg-white/5 border border-white/20 text-white hover:bg-white/10 hover:border-white/35 transition-all text-xs font-medium rounded-none',
+                socialButtonsBlockButtonText: 'text-white font-medium text-xs',
+                dividerLine: 'bg-white/20',
+                dividerText: 'text-slate-500 text-xs font-mono',
+                formButtonPrimary: 'bg-white hover:bg-white/90 text-black font-bold py-2.5 rounded-none transition-all shadow-md text-xs tracking-wider uppercase',
+                footer: 'bg-[#040508] border-t border-white/20 p-4 rounded-none',
+                footerAction: 'bg-transparent text-slate-400 text-xs justify-center',
+                footerActionLink: 'text-sky-400 hover:text-sky-300 font-medium transition-colors text-xs',
+                footerActionText: 'text-slate-400 text-xs',
+                footerPages: 'bg-[#040508]',
+                footerPagesLink: 'text-slate-400 hover:text-white text-xs',
+                formFieldInput: 'bg-[#040508] border-white/20 text-white rounded-none text-xs focus:border-white/60 focus:ring-1 focus:ring-white/60 transition-all placeholder:text-slate-600',
+                formFieldLabel: 'text-slate-300 text-xs font-mono uppercase tracking-wider',
+                identityPreviewText: 'text-slate-300 text-xs',
+                identityPreviewEditButtonIcon: 'text-sky-400',
+                formHeaderSubtitle: 'text-slate-400 text-xs text-center',
+                formResendCodeLink: 'text-sky-400 hover:text-sky-300 text-xs',
               }
             }}
           />

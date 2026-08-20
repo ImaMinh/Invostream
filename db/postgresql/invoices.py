@@ -124,11 +124,10 @@ async def insert_invoice(extracted_data: Invoice) -> str:
     # placeholder for values in SQL query 
     placeholders = ",".join(f"${i+1}" for i in range(len(values)))
     
-    # construct the SQL query (ON CONFLICT for dedup safety net):
+    # construct the SQL query:
     sql_query = f"""
     INSERT INTO invoices ({",".join(columns)})
     VALUES ({placeholders})
-    ON CONFLICT (content_hash) WHERE content_hash IS NOT NULL DO NOTHING
     RETURNING id;
     """
     
@@ -141,14 +140,11 @@ async def insert_invoice(extracted_data: Invoice) -> str:
             async with connection.transaction():
                 invoice_id = await connection.fetchval(sql_query, *values)
                 
-                # If invoice_id is None, the insert was skipped due to duplicate content_hash
                 if invoice_id is None:
-                    print(f"<--INSERT_INVOICE--> Duplicate detected (content_hash), skipping invoice for job {extracted_data.job_id}")
+                    print(f"<--INSERT_INVOICE--> Failed to insert invoice for job {extracted_data.job_id}")
                     return None
                 
-                
                 await insert_line_items(invoice_id, extracted_data.line_items, connection)
-                # print(f"<--INSERT_INVOICE--> Successfully inserted invoice with ID: {invoice_id} for job {extracted_data.job_id}")
                 return str(invoice_id)
     except Exception as e:
         print(f"<--INSERT_INVOICE--> Error inserting invoice for job {extracted_data.job_id}: {e}")
